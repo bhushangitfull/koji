@@ -5,25 +5,52 @@
 
 import { Platform } from 'react-native';
 
-const tintColorLight = '#0a7ea4';
-const tintColorDark = '#fff';
+// Primary aesthetic colors from palette
+const PRIMARY = '#B19CD9';
+const SECONDARY = '#7FE5DE';
+const ACCENT = '#FFB6D9';
+const BACKGROUND = '#FFFACD';
+const SURFACE = '#FFFFFF';
+const DARK_BG = '#000000';
+
+// Text colors
+const TEXT_PRIMARY = '#1A1A1A';
+const TEXT_SECONDARY = '#666666';
+
+// Status colors
+const SUCCESS = '#A8E6CF';
+const WARNING = '#FFCC99';
 
 export const Colors = {
   light: {
-    text: '#11181C',
-    background: '#fff',
-    tint: tintColorLight,
-    icon: '#687076',
-    tabIconDefault: '#687076',
-    tabIconSelected: tintColorLight,
+    text: TEXT_PRIMARY,
+    textSecondary: TEXT_SECONDARY,
+    background: BACKGROUND,
+    surface: SURFACE,
+    primary: PRIMARY,
+    secondary: SECONDARY,
+    accent: ACCENT,
+    tint: PRIMARY,
+    icon: TEXT_SECONDARY,
+    tabIconDefault: TEXT_SECONDARY,
+    tabIconSelected: PRIMARY,
+    success: SUCCESS,
+    warning: WARNING,
   },
   dark: {
     text: '#ECEDEE',
-    background: '#151718',
-    tint: tintColorDark,
+    textSecondary: '#9BA1A6',
+    background: DARK_BG,
+    surface: '#1A1A1A',
+    primary: SECONDARY,
+    secondary: PRIMARY,
+    accent: ACCENT,
+    tint: SECONDARY,
     icon: '#9BA1A6',
     tabIconDefault: '#9BA1A6',
-    tabIconSelected: tintColorDark,
+    tabIconSelected: SECONDARY,
+    success: SUCCESS,
+    warning: WARNING,
   },
 };
 
