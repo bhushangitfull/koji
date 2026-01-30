@@ -5,11 +5,20 @@
 
 import { Platform } from 'react-native';
 
+// New Retro Pastel aesthetic colors - soft and light
+const PASTEL_PINK = '#FFB3D9';
+const PASTEL_BLUE = '#B3E5FC';
+const PASTEL_INDIGO = '#7986CB';
+const PASTEL_PURPLE = '#E1BEE7';
+const PASTEL_YELLOW = '#FFF9C4';
+const PASTEL_PEACH = '#FFE0B2';
+const PASTEL_MINT = '#B2DFDB';
+
 // Primary aesthetic colors from palette
-const PRIMARY = '#B19CD9';
-const SECONDARY = '#7FE5DE';
-const ACCENT = '#FFB6D9';
-const BACKGROUND = '#FFFACD';
+const PRIMARY = '#FFB3D9';
+const SECONDARY = '#B3E5FC';
+const ACCENT = '#FFF9C4';
+const BACKGROUND = '#FFF9C4';
 const SURFACE = '#FFFFFF';
 const DARK_BG = '#000000';
 
@@ -18,63 +27,77 @@ const TEXT_PRIMARY = '#1A1A1A';
 const TEXT_SECONDARY = '#666666';
 
 // Status colors
-const SUCCESS = '#A8E6CF';
-const WARNING = '#FFCC99';
+const SUCCESS = '#B2DFDB';
+const WARNING = '#FFE0B2';
 
 export const Colors = {
   light: {
     text: TEXT_PRIMARY,
     textSecondary: TEXT_SECONDARY,
-    background: BACKGROUND,
-    surface: SURFACE,
-    primary: PRIMARY,
-    secondary: SECONDARY,
-    accent: ACCENT,
-    tint: PRIMARY,
+    background: '#FFFDF7',
+    surface: '#FFFFFF',
+    primary: PASTEL_PINK,
+    secondary: PASTEL_BLUE,
+    accent: PASTEL_YELLOW,
+    tint: PASTEL_PINK,
     icon: TEXT_SECONDARY,
     tabIconDefault: TEXT_SECONDARY,
-    tabIconSelected: PRIMARY,
+    tabIconSelected: PASTEL_PINK,
     success: SUCCESS,
     warning: WARNING,
+    // Retro specific
+    retroBorder: '#333333',
+    retroBg: '#FFFDF7',
+    retroLavender: PASTEL_PURPLE,
+    retroMint: PASTEL_MINT,
+    retroPeach: PASTEL_PEACH,
+    retroIndigo: PASTEL_INDIGO,
   },
   dark: {
     text: '#ECEDEE',
     textSecondary: '#9BA1A6',
-    background: DARK_BG,
-    surface: '#1A1A1A',
-    primary: SECONDARY,
-    secondary: PRIMARY,
-    accent: ACCENT,
-    tint: SECONDARY,
+    background: '#FFFDF7',
+    surface: PASTEL_PURPLE,
+    primary: PASTEL_PINK,
+    secondary: PASTEL_BLUE,
+    accent: PASTEL_YELLOW,
+    tint: PASTEL_PINK,
     icon: '#9BA1A6',
     tabIconDefault: '#9BA1A6',
-    tabIconSelected: SECONDARY,
+    tabIconSelected: PASTEL_PINK,
     success: SUCCESS,
     warning: WARNING,
+    // Retro specific
+    retroBorder: '#333333',
+    retroBg: '#FFFDF7',
+    retroLavender: PASTEL_PURPLE,
+    retroMint: PASTEL_MINT,
+    retroPeach: PASTEL_PEACH,
+    retroIndigo: PASTEL_INDIGO,
   },
 };
 
 export const Fonts = Platform.select({
   ios: {
-    /** iOS `UIFontDescriptorSystemDesignDefault` */
-    sans: 'system-ui',
-    /** iOS `UIFontDescriptorSystemDesignSerif` */
-    serif: 'ui-serif',
-    /** iOS `UIFontDescriptorSystemDesignRounded` */
-    rounded: 'ui-rounded',
-    /** iOS `UIFontDescriptorSystemDesignMonospaced` */
-    mono: 'ui-monospace',
+    /** Lofi retro main font */
+    sans: 'Segoe Print',
+    /** Lofi serif - typewriter style */
+    serif: 'Courier',
+    /** Lofi rounded - handwritten feel */
+    rounded: 'Chalkboard SE',
+    /** Lofi monospace */
+    mono: 'Menlo',
   },
   default: {
-    sans: 'normal',
-    serif: 'serif',
-    rounded: 'normal',
-    mono: 'monospace',
+    sans: 'Comic Sans MS, cursive',
+    serif: 'Courier',
+    rounded: 'Comic Sans MS, cursive',
+    mono: 'Courier New, monospace',
   },
   web: {
-    sans: "system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
-    serif: "Georgia, 'Times New Roman', serif",
-    rounded: "'SF Pro Rounded', 'Hiragino Maru Gothic ProN', Meiryo, 'MS PGothic', sans-serif",
-    mono: "SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace",
+    sans: "'Comic Sans MS', 'Trebuchet MS', cursive, sans-serif",
+    serif: "'Courier New', Courier, monospace",
+    rounded: "'Segoe Print', 'Comic Sans MS', cursive, sans-serif",
+    mono: "'Courier New', Courier, 'Liberation Mono', monospace",
   },
 });
