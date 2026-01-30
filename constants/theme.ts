@@ -34,7 +34,7 @@ export const Colors = {
   light: {
     text: TEXT_PRIMARY,
     textSecondary: TEXT_SECONDARY,
-    background: '#FFFDF7',
+    background: '#B3E5FC',
     surface: '#FFFFFF',
     primary: PASTEL_PINK,
     secondary: PASTEL_BLUE,
@@ -47,7 +47,7 @@ export const Colors = {
     warning: WARNING,
     // Retro specific
     retroBorder: '#333333',
-    retroBg: '#FFFDF7',
+    retroBg: '#B3E5FC',
     retroLavender: PASTEL_PURPLE,
     retroMint: PASTEL_MINT,
     retroPeach: PASTEL_PEACH,
@@ -56,7 +56,7 @@ export const Colors = {
   dark: {
     text: '#ECEDEE',
     textSecondary: '#9BA1A6',
-    background: '#FFFDF7',
+    background: '#B3E5FC',
     surface: PASTEL_PURPLE,
     primary: PASTEL_PINK,
     secondary: PASTEL_BLUE,
@@ -69,7 +69,7 @@ export const Colors = {
     warning: WARNING,
     // Retro specific
     retroBorder: '#333333',
-    retroBg: '#FFFDF7',
+    retroBg: '#B3E5FC',
     retroLavender: PASTEL_PURPLE,
     retroMint: PASTEL_MINT,
     retroPeach: PASTEL_PEACH,
