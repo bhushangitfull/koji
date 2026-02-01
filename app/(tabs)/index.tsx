@@ -6,11 +6,11 @@ import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 const MOTIVATIONAL_QUOTES = [
-  '💡 Consistency is key! Try to study a little bit every day.',
-  '🎯 Every episode watched is progress made!',
-  '🌟 Small steps lead to big achievements!',
-  '📚 Knowledge is the best investment.',
-  '💪 You got this! Keep pushing forward!',
+  'Consistency is key! Try to study a little bit every day.',
+  'Every episode watched is progress made!',
+  'Small steps lead to big achievements!',
+  'Knowledge is the best investment.',
+  'You got this! Keep pushing forward!',
 ];
 
 const RECENT_ACTIVITIES = [
@@ -20,10 +20,10 @@ const RECENT_ACTIVITIES = [
 ];
 
 const ACHIEVEMENTS = [
-  { id: 1, name: 'First Step', icon: '🚀', unlocked: true },
-  { id: 2, name: '5-Day Streak', icon: '🔥', unlocked: false },
-  { id: 3, name: 'Speed Learner', icon: '⚡', unlocked: true },
-  { id: 4, name: 'Dedicated', icon: '🏆', unlocked: false },
+  { id: 1, name: 'First Step', icon: 'RS', unlocked: true },
+  { id: 2, name: '5-Day Streak', icon: 'ST', unlocked: false },
+  { id: 3, name: 'Speed Learner', icon: 'SL', unlocked: true },
+  { id: 4, name: 'Dedicated', icon: 'DD', unlocked: false },
 ];
 
 export default function HomeScreen() {
@@ -42,7 +42,7 @@ export default function HomeScreen() {
         color="pink"
         style={styles.windowSection}
       >
-        <Text style={[styles.title, { color: '#000000' }]}>🎌 Koji Study Hub</Text>
+        <Text style={[styles.title, { color: '#000000' }]}>Koji Study Hub</Text>
         <Text style={[styles.subtitle, { color: '#333333' }]}>
           Your personal anime & language learning companion
         </Text>
@@ -50,20 +50,20 @@ export default function HomeScreen() {
 
       {/* Study Streak */}
       <RetroWindow
-        title="🔥 Current Streak"
+        title="Current Streak"
         color="purple"
         style={styles.windowSection}
       >
         <View style={styles.streakContainer}>
           <Text style={[styles.streakNumber, { color: colors.primary }]}>12</Text>
           <Text style={[styles.streakLabel, { color: '#333333' }]}>Days</Text>
-          <Text style={[styles.streakSubtext, { color: '#666666' }]}>Keep it going! 💪</Text>
+          <Text style={[styles.streakSubtext, { color: '#666666' }]}>Keep it going!</Text>
         </View>
       </RetroWindow>
 
       {/* Daily Goal */}
       <RetroWindow
-        title="🎯 Daily Goal"
+        title="Daily Goal"
         color="pink"
         style={styles.windowSection}
       >
@@ -72,7 +72,7 @@ export default function HomeScreen() {
             <View style={[styles.progressFill, { width: '60%', backgroundColor: colors.primary }]} />
           </View>
           <Text style={[styles.goalText, { color: '#333333' }]}>
-            60% complete - 30 more minutes to go! ⏱️
+            60% complete - 30 more minutes to go!
           </Text>
         </View>
       </RetroWindow>
@@ -150,14 +150,14 @@ export default function HomeScreen() {
 
       {/* Recent Activity */}
       <RetroWindow
-        title="📖 Recent Activity"
+        title="Recent Activity"
         color="pink"
         style={styles.windowSection}
       >
         {RECENT_ACTIVITIES.map((activity) => (
           <View key={activity.id} style={styles.activityItem}>
             <Text style={[styles.activityTitle, { color: '#000000' }]}>
-              {activity.type === 'completed' ? '✅' : '▶️'} {activity.title}
+              {activity.type === 'completed' ? '[C]' : '[P]'} {activity.title}
             </Text>
             <Text style={[styles.activityTime, { color: '#666666' }]}>{activity.time}</Text>
           </View>
@@ -166,7 +166,7 @@ export default function HomeScreen() {
 
       {/* Achievements */}
       <RetroWindow
-        title="🏆 Achievements"
+        title="Achievements"
         color="purple"
         style={styles.windowSection}
       >
@@ -184,7 +184,7 @@ export default function HomeScreen() {
                 {achievement.name}
               </Text>
               {!achievement.unlocked && (
-                <Text style={[styles.lockedBadge, { color: '#999999' }]}>🔒</Text>
+                <Text style={[styles.lockedBadge, { color: '#999999' }]}>[L]</Text>
               )}
             </View>
           ))}
@@ -193,7 +193,7 @@ export default function HomeScreen() {
 
       {/* Study Schedule */}
       <RetroWindow
-        title="📅 Study Schedule"
+        title="Study Schedule"
         color="pink"
         style={[styles.windowSection, { marginBottom: 40 }]}
       >
