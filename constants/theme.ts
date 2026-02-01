@@ -80,24 +80,24 @@ export const Colors = {
 export const Fonts = Platform.select({
   ios: {
     /** Lofi retro main font */
-    sans: 'Segoe Print',
+    sans: 'VT323',
     /** Lofi serif - typewriter style */
-    serif: 'Courier',
+    serif: 'VT323',
     /** Lofi rounded - handwritten feel */
-    rounded: 'Chalkboard SE',
+    rounded: 'VT323',
     /** Lofi monospace */
-    mono: 'Menlo',
+    mono: 'VT323',
   },
   default: {
-    sans: 'Comic Sans MS, cursive',
-    serif: 'Courier',
-    rounded: 'Comic Sans MS, cursive',
-    mono: 'Courier New, monospace',
+    sans: 'monospace',
+    serif: 'monospace',
+    rounded: 'monospace',
+    mono: 'monospace',
   },
   web: {
-    sans: "'Comic Sans MS', 'Trebuchet MS', cursive, sans-serif",
-    serif: "'Courier New', Courier, monospace",
-    rounded: "'Segoe Print', 'Comic Sans MS', cursive, sans-serif",
-    mono: "'Courier New', Courier, 'Liberation Mono', monospace",
+    sans: "'VT323', monospace",
+    serif: "'VT323', monospace",
+    rounded: "'VT323', monospace",
+    mono: "'VT323', monospace",
   },
 });
