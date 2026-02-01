@@ -15,7 +15,7 @@ const PASTEL_PEACH = '#FFE0B2';
 const PASTEL_MINT = '#B2DFDB';
 
 // Primary aesthetic colors from palette
-const PRIMARY = '#FFB3D9';
+const PRIMARY = '#9B59B6';
 const SECONDARY = '#B3E5FC';
 const ACCENT = '#FFF9C4';
 const BACKGROUND = '#FFF9C4';
@@ -36,13 +36,13 @@ export const Colors = {
     textSecondary: TEXT_SECONDARY,
     background: '#B3E5FC',
     surface: '#FFFFFF',
-    primary: PASTEL_PINK,
+    primary: '#9B59B6',
     secondary: PASTEL_BLUE,
     accent: PASTEL_YELLOW,
-    tint: PASTEL_PINK,
+    tint: '#9B59B6',
     icon: TEXT_SECONDARY,
     tabIconDefault: TEXT_SECONDARY,
-    tabIconSelected: PASTEL_PINK,
+    tabIconSelected: '#9B59B6',
     success: SUCCESS,
     warning: WARNING,
     // Retro specific
@@ -58,13 +58,13 @@ export const Colors = {
     textSecondary: '#9BA1A6',
     background: '#B3E5FC',
     surface: PASTEL_PURPLE,
-    primary: PASTEL_PINK,
+    primary: '#9B59B6',
     secondary: PASTEL_BLUE,
     accent: PASTEL_YELLOW,
-    tint: PASTEL_PINK,
+    tint: '#9B59B6',
     icon: '#9BA1A6',
     tabIconDefault: '#9BA1A6',
-    tabIconSelected: PASTEL_PINK,
+    tabIconSelected: '#9B59B6',
     success: SUCCESS,
     warning: WARNING,
     // Retro specific
