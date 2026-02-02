@@ -90,7 +90,7 @@ export default function SignInScreen() {
 
           {/* Main Header Box with Shadow */}
           <View style={styles.headerShadowContainer}>
-            <View style={[styles.headerShadow, { backgroundColor: colors.primary }]} />
+            <View style={[styles.headerShadow, { backgroundColor: colors.primary }]} pointerEvents="none" />
             <View style={[styles.headerBox, { 
               backgroundColor: colors.retroLavender,
               borderColor: colors.retroBorder,
@@ -116,7 +116,7 @@ export default function SignInScreen() {
 
           {/* Form Box with Shadow */}
           <View style={styles.formShadowContainer}>
-            <View style={[styles.formShadow, { backgroundColor: colors.primary }]} />
+            <View style={[styles.formShadow, { backgroundColor: colors.primary }]} pointerEvents="none" />
             <View style={[styles.formBox, { 
               backgroundColor: colors.retroPeach,
               borderColor: colors.retroBorder,
@@ -190,7 +190,7 @@ export default function SignInScreen() {
 
           {/* Sign Up Box with Shadow */}
           <View style={styles.signUpShadowContainer}>
-            <View style={[styles.signUpShadow, { backgroundColor: colors.primary }]} />
+            <View style={[styles.signUpShadow, { backgroundColor: colors.primary }]} pointerEvents="none" />
             <View style={[styles.signUpBox, { 
               backgroundColor: colors.retroMint,
               borderColor: colors.retroBorder,
@@ -268,8 +268,8 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: 6,
     left: 6,
-    right: -6,
-    bottom: -6,
+    right: 6,
+    bottom: 6,
     borderWidth: 3,
     borderColor: '#000',
   },
@@ -311,8 +311,8 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: 6,
     left: 6,
-    right: -6,
-    bottom: -6,
+    right: 6,
+    bottom: 6,
     borderWidth: 3,
     borderColor: '#000',
   },
@@ -355,6 +355,7 @@ const styles = StyleSheet.create({
   // Sign up box with shadow
   signUpShadowContainer: {
     marginBottom: 20,
+    marginTop: 40,
     position: 'relative',
   },
   signUpShadow: {

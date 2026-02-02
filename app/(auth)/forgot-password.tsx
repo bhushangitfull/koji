@@ -1,5 +1,5 @@
 /**
- * Forgot Password Screen - Comforting Retro Design
+ * Forgot Password Screen - Retro Design with Offset Shadows
  */
 
 import { AuthButton } from '@/components/AuthButton';
@@ -114,6 +114,18 @@ export default function ForgotPasswordScreen() {
     return null;
   }
 
+  const getHeaderColor = () => {
+    if (step === 'email') return colors.retroPeach;
+    if (step === 'reset') return colors.retroLavender;
+    return colors.retroMint;
+  };
+
+  const getFormColor = () => {
+    if (step === 'email') return colors.retroLavender;
+    if (step === 'reset') return colors.retroPeach;
+    return colors.accent;
+  };
+
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.retroBg }]}>
       <KeyboardAvoidingView
@@ -124,196 +136,215 @@ export default function ForgotPasswordScreen() {
           contentContainerStyle={styles.scrollContent}
           showsVerticalScrollIndicator={false}
         >
-          {/* Decorative Top */}
-          <View style={styles.decorativeTop}>
-            <View style={[styles.decorativeDot, { backgroundColor: colors.retroLavender }]} />
-            <View style={[styles.decorativeDot, { backgroundColor: colors.retroPeach }]} />
-            <View style={[styles.decorativeDot, { backgroundColor: colors.retroMint }]} />
-          </View>
-
-          {/* Header */}
-          <View style={[styles.headerCard, { backgroundColor: 'rgba(255, 255, 255, 0.6)' }]}>
-            <View style={[styles.iconContainer, { backgroundColor: colors.primary }]}>
-              <MaterialCommunityIcons
-                name={step === 'success' ? 'check-circle' : 'lock-reset'}
-                size={44}
-                color="success" 
-              />
+          {/* Retro Decorative Header */}
+          <View style={styles.decorativeHeader}>
+            <View style={styles.decorativeLine}>
+              <View style={[styles.lineSegment, { backgroundColor: colors.primary }]} />
+              <View style={[styles.lineSegment, { backgroundColor: colors.retroLavender }]} />
+              <View style={[styles.lineSegment, { backgroundColor: colors.retroPeach }]} />
             </View>
-            <Text style={[styles.title, { color: colors.primary, fontFamily: 'VT323' }]}>
-              {step === 'success' ? 'All Set!' : 'Password Reset'}
-            </Text>
-            <Text style={[styles.subtitle, { color: colors.text, fontFamily: 'VT323' }]}>
-              {step === 'email' && 'No worries, we\'ll help you get back in'}
-              {step === 'reset' && 'Create a new password you\'ll remember'}
-              {step === 'success' && 'You\'re ready to continue learning!'}
-            </Text>
           </View>
 
-          {/* Form */}
-          <View style={[styles.formCard, { backgroundColor: 'rgba(255, 255, 255, 0.85)' }]}>
-            {step === 'email' && (
-              <>
-                <AuthInput
-                  placeholder="you@example.com"
-                  value={email}
-                  onChangeText={setEmail}
-                  icon="email"
-                  keyboardType="email-address"
-                  autoCapitalize="none"
-                  editable={!loading}
+          {/* Main Header Box with Shadow */}
+          <View style={styles.headerShadowContainer}>
+            <View style={[styles.headerShadow, { backgroundColor: colors.primary }]} />
+            <View style={[styles.headerBox, { 
+              backgroundColor: getHeaderColor(),
+              borderColor: colors.retroBorder,
+            }]}>
+              <View style={[styles.iconBox, { 
+                backgroundColor: colors.primary,
+                borderColor: colors.retroBorder,
+              }]}>
+                <MaterialCommunityIcons
+                  name={step === 'success' ? 'check' : 'lock-reset'}
+                  size={40}
+                  color={colors.retroBg}
                 />
+              </View>
+              <Text style={[styles.title, { color: colors.retroBorder, fontFamily: 'VT323' }]}>
+                {step === 'success' ? 'ALL SET!' : 'PASSWORD RESET'}
+              </Text>
+              <Text style={[styles.subtitle, { color: colors.retroBorder, fontFamily: 'VT323' }]}>
+                {step === 'email' && 'no worries, we\'ll help you'}
+                {step === 'reset' && 'create a new password'}
+                {step === 'success' && 'ready to continue learning!'}
+              </Text>
+            </View>
+          </View>
 
-                <View style={[styles.infoBox, { backgroundColor: colors.retroMint + '40' }]}>
-                  <MaterialCommunityIcons
-                    name="information"
-                    size={20}
-                    color={colors.primary}
-                    style={{ marginRight: 10 }}
+          {/* Form Box with Shadow */}
+          <View style={styles.formShadowContainer}>
+            <View style={[styles.formShadow, { backgroundColor: colors.primary }]} />
+            <View style={[styles.formBox, { 
+              backgroundColor: getFormColor(),
+              borderColor: colors.retroBorder,
+            }]}>
+              {step === 'email' && (
+                <>
+                  <AuthInput
+                    label="Email Address"
+                    placeholder="you@example.com"
+                    value={email}
+                    onChangeText={setEmail}
+                    icon="email"
+                    keyboardType="email-address"
+                    autoCapitalize="none"
+                    editable={!loading}
                   />
-                  <Text style={[styles.infoText, { color: colors.primary, fontFamily: 'VT323' }]}>
-                    We'll send a reset link to your email
+
+                  <View style={[styles.infoBox, { 
+                    backgroundColor: colors.retroMint,
+                    borderColor: colors.retroBorder,
+                  }]}>
+                    <Text style={[styles.infoText, { color: colors.retroBorder, fontFamily: 'VT323' }]}>
+                      ▸ we'll send a reset link to your email
+                    </Text>
+                  </View>
+                </>
+              )}
+
+              {step === 'reset' && (
+                <>
+                  <AuthInput
+                    label="Reset Code"
+                    placeholder="Enter code from email"
+                    value={resetToken}
+                    onChangeText={setResetToken}
+                    icon="key"
+                    editable={!loading}
+                  />
+
+                  <AuthInput
+                    label="New Password"
+                    placeholder="Choose a new password"
+                    value={newPassword}
+                    onChangeText={setNewPassword}
+                    icon="lock"
+                    isPassword
+                    editable={!loading}
+                  />
+
+                  <AuthInput
+                    label="Confirm Password"
+                    placeholder="Type it again to be sure"
+                    value={confirmPassword}
+                    onChangeText={setConfirmPassword}
+                    icon="lock-check"
+                    isPassword
+                    editable={!loading}
+                  />
+
+                  <View style={[styles.infoBox, { 
+                    backgroundColor: colors.retroMint,
+                    borderColor: colors.retroBorder,
+                  }]}>
+                    <Text style={[styles.infoText, { color: colors.retroBorder, fontFamily: 'VT323' }]}>
+                      ▸ make it strong and memorable!
+                    </Text>
+                  </View>
+                </>
+              )}
+
+              {step === 'success' && (
+                <View style={styles.successContainer}>
+                  <View style={[styles.successBox, {
+                    backgroundColor: colors.primary,
+                    borderColor: colors.retroBorder,
+                  }]}>
+                    <MaterialCommunityIcons
+                      name="check-circle"
+                      size={64}
+                      color="#FFFFFF"
+                      style={{ marginBottom: 16 }}
+                    />
+                    <Text style={[styles.successText, { color: '#FFFFFF', fontFamily: 'VT323' }]}>
+                      PASSWORD RESET COMPLETE!
+                    </Text>
+                  </View>
+                  <Text style={[styles.successSubtext, { color: colors.retroBorder, fontFamily: 'VT323' }]}>
+                    taking you to sign in...
+                  </Text>
+                  <View style={styles.loadingDots}>
+                    <View style={[styles.dot, { backgroundColor: colors.primary }]} />
+                    <View style={[styles.dot, { backgroundColor: colors.primary }]} />
+                    <View style={[styles.dot, { backgroundColor: colors.primary }]} />
+                  </View>
+                </View>
+              )}
+
+              {error && (
+                <View style={[styles.errorBox, { 
+                  backgroundColor: '#FFE5E5',
+                  borderColor: '#FF6B6B',
+                }]}>
+                  <Text style={[styles.errorText, { color: '#FF6B6B', fontFamily: 'VT323' }]}>
+                    ✕ {error}
                   </Text>
                 </View>
-              </>
-            )}
+              )}
 
-            {step === 'reset' && (
-              <>
-                <AuthInput
-                  label="Reset Code"
-                  placeholder="Enter code from email"
-                  value={resetToken}
-                  onChangeText={setResetToken}
-                  icon="key"
-                  editable={!loading}
+              {step !== 'success' && (
+                <AuthButton
+                  label={step === 'email' ? 'SEND RESET LINK' : 'RESET PASSWORD'}
+                  onPress={step === 'email' ? handleRequestReset : handleResetPassword}
+                  loading={loading}
+                  disabled={loading}
                 />
-
-                <AuthInput
-                  label="New Password"
-                  placeholder="Choose a new password"
-                  value={newPassword}
-                  onChangeText={setNewPassword}
-                  icon="lock"
-                  isPassword
-                  editable={!loading}
-                />
-
-                <AuthInput
-                  label="Confirm Password"
-                  placeholder="Type it again to be sure"
-                  value={confirmPassword}
-                  onChangeText={setConfirmPassword}
-                  icon="lock-check"
-                  isPassword
-                  editable={!loading}
-                />
-
-                <View style={[styles.infoBox, { backgroundColor: colors.retroPeach + '40' }]}>
-                  <MaterialCommunityIcons
-                    name="shield-check"
-                    size={20}
-                    color={colors.primary}
-                    style={{ marginRight: 10 }}
-                  />
-                  <Text style={[styles.infoText, { color: colors.text, fontFamily: 'VT323' }]}>
-                    Make it strong and memorable!
-                  </Text>
-                </View>
-              </>
-            )}
-
-            {step === 'success' && (
-              <View style={styles.successContainer}>
-                <MaterialCommunityIcons
-                  name="check-decagram"
-                  size={80}
-                  color={colors.primary}
-                  style={{ marginBottom: 20 }}
-                />
-                <Text style={[styles.successText, { color: colors.text, fontFamily: 'VT323' }]}>
-                  Password Reset Complete!
-                </Text>
-                <Text style={[styles.successSubtext, { color: colors.textSecondary, fontFamily: 'VT323' }]}>
-                  Taking you to sign in...
-                </Text>
-                <View style={styles.loadingDots}>
-                  <View style={[styles.dot, { backgroundColor: colors.primary }]} />
-                  <View style={[styles.dot, { backgroundColor: colors.primary }]} />
-                  <View style={[styles.dot, { backgroundColor: colors.primary }]} />
-                </View>
-              </View>
-            )}
-
-            {error && (
-              <View style={[styles.errorBox, { backgroundColor: '#FFE5E5' }]}>
-                <MaterialCommunityIcons
-                  name="alert-circle"
-                  size={20}
-                  color="#FF6B6B"
-                  style={{ marginRight: 10 }}
-                />
-                <Text style={[styles.errorText, { color: '#FF6B6B', fontFamily: 'VT323' }]}>
-                  {error}
-                </Text>
-              </View>
-            )}
-
-            {step !== 'success' && (
-              <AuthButton
-                label={step === 'email' ? 'Send Reset Link' : 'Reset Password'}
-                onPress={step === 'email' ? handleRequestReset : handleResetPassword}
-                loading={loading}
-                disabled={loading}
-              />
-            )}
+              )}
+            </View>
           </View>
 
           {/* Back Link */}
           {step !== 'success' && (
             <>
-              <View style={styles.dividerContainer}>
-                <View style={[styles.dividerLine, { backgroundColor: colors.primary + '30' }]} />
+              <View style={styles.pixelDivider}>
+                <View style={[styles.pixel, { backgroundColor: colors.primary }]} />
+                <View style={[styles.pixel, { backgroundColor: colors.retroPeach }]} />
+                <View style={[styles.pixel, { backgroundColor: colors.primary }]} />
               </View>
-              <TouchableOpacity
-                onPress={() => {
-                  if (step === 'reset') {
-                    setStep('email');
-                    setEmail('');
-                    setResetToken('');
-                    setNewPassword('');
-                    setConfirmPassword('');
-                    setError(null);
-                  } else {
-                    router.replace('/(auth)/sign-in');
-                  }
-                }}
-                disabled={loading}
-                style={styles.backButton}
-              >
-                <MaterialCommunityIcons
-                  name="arrow-left"
-                  size={20}
-                  color={colors.primary}
-                  style={{ marginRight: 8, opacity: loading ? 0.5 : 1 }}
-                />
-                <Text
-                  style={[
-                    styles.backLink,
-                    { color: colors.primary, opacity: loading ? 0.5 : 1, fontFamily: 'VT323' },
-                  ]}
+              
+              <View style={styles.backShadowContainer}>
+                <View style={[styles.backShadow, { backgroundColor: colors.primary }]} />
+                <TouchableOpacity
+                  onPress={() => {
+                    if (step === 'reset') {
+                      setStep('email');
+                      setEmail('');
+                      setResetToken('');
+                      setNewPassword('');
+                      setConfirmPassword('');
+                      setError(null);
+                    } else {
+                      router.back();
+                    }
+                  }}
+                  disabled={loading}
+                  style={[styles.backButtonBox, {
+                    backgroundColor: colors.retroMint,
+                    borderColor: colors.retroBorder,
+                  }]}
                 >
-                  Back to {step === 'reset' ? 'Email' : 'Sign In'}
-                </Text>
-              </TouchableOpacity>
+                  <Text
+                    style={[
+                      styles.backLink,
+                      { color: colors.retroBorder, opacity: loading ? 0.5 : 1, fontFamily: 'VT323' },
+                    ]}
+                  >
+                    ← BACK TO {step === 'reset' ? 'EMAIL' : 'SIGN IN'}
+                  </Text>
+                </TouchableOpacity>
+              </View>
             </>
           )}
 
-          {/* Decorative Bottom */}
-          <View style={styles.decorativeBottom}>
-            <View style={[styles.decorativeSquare, { backgroundColor: colors.retroPeach }]} />
-            <View style={[styles.decorativeSquare, { backgroundColor: colors.retroLavender }]} />
-            <View style={[styles.decorativeSquare, { backgroundColor: colors.retroMint }]} />
+          {/* Decorative Footer */}
+          <View style={styles.decorativeFooter}>
+            <View style={styles.decorativeLine}>
+              <View style={[styles.lineSegment, { backgroundColor: colors.retroMint }]} />
+              <View style={[styles.lineSegment, { backgroundColor: colors.retroPeach }]} />
+              <View style={[styles.lineSegment, { backgroundColor: colors.primary }]} />
+            </View>
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
@@ -330,133 +361,119 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingVertical: 24,
   },
-  decorativeTop: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    gap: 16,
-    marginBottom: 24,
-  },
-  decorativeDot: {
-    width: 12,
-    height: 12,
-    borderRadius: 6,
-  },
-  headerCard: {
-    alignItems: 'center',
-    marginBottom: 28,
-    paddingVertical: 36,
-    paddingHorizontal: 24,
-    borderRadius: 24,
-    borderWidth: 3,
-    borderColor: '#9B59B6',
-    borderTopColor: '#E1BEE7',
-    borderLeftColor: '#E1BEE7',
-    borderBottomColor: '#5A2D7A',
-    borderRightColor: '#5A2D7A',
-  },
-  iconContainer: {
-    width: 88,
-    height: 88,
-    borderRadius: 44,
-    alignItems: 'center',
-    justifyContent: 'center',
+  decorativeHeader: {
     marginBottom: 20,
+  },
+  decorativeLine: {
+    flexDirection: 'row',
+    gap: 8,
+    justifyContent: 'center',
+  },
+  lineSegment: {
+    width: 60,
+    height: 4,
+  },
+  // Header with shadow
+  headerShadowContainer: {
+    marginBottom: 24,
+    position: 'relative',
+  },
+  headerShadow: {
+    position: 'absolute',
+    top: 6,
+    left: 6,
+    right: -6,
+    bottom: -6,
     borderWidth: 3,
-    borderColor: '#9B59B6',
-    borderTopColor: '#E1BEE7',
-    borderLeftColor: '#E1BEE7',
-    borderBottomColor: '#5A2D7A',
-    borderRightColor: '#5A2D7A',
+    borderColor: '#000',
+  },
+  headerBox: {
+    alignItems: 'center',
+    paddingVertical: 32,
+    paddingHorizontal: 24,
+    borderWidth: 3,
+    position: 'relative',
+    zIndex: 1,
+  },
+  iconBox: {
+    width: 80,
+    height: 80,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 16,
+    borderWidth: 3,
   },
   title: {
-    fontSize: 42,
+    fontSize: 40,
     fontWeight: '400',
     marginBottom: 8,
     textAlign: 'center',
-    letterSpacing: 1,
-    fontFamily: 'VT323',
+    letterSpacing: 2,
+    textTransform: 'uppercase',
   },
   subtitle: {
     fontSize: 20,
     textAlign: 'center',
     lineHeight: 26,
-    fontFamily: 'VT323',
   },
-  formCard: {
-    borderRadius: 24,
-    padding: 28,
+  // Form with shadow
+  formShadowContainer: {
     marginBottom: 24,
+    position: 'relative',
+  },
+  formShadow: {
+    position: 'absolute',
+    top: 6,
+    left: 6,
+    right: -6,
+    bottom: -6,
     borderWidth: 3,
-    borderColor: '#9B59B6',
-    borderTopColor: '#E1BEE7',
-    borderLeftColor: '#E1BEE7',
-    borderBottomColor: '#5A2D7A',
-    borderRightColor: '#5A2D7A',
+    borderColor: '#000',
+  },
+  formBox: {
+    borderWidth: 3,
+    padding: 24,
+    position: 'relative',
+    zIndex: 1,
   },
   infoBox: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderRadius: 16,
     padding: 16,
     marginBottom: 20,
-    borderWidth: 2,
-    borderColor: '#7FE5DE',
-    borderTopColor: '#B2F5F1',
-    borderLeftColor: '#B2F5F1',
-    borderBottomColor: '#2BB8AE',
-    borderRightColor: '#2BB8AE',
+    borderWidth: 3,
   },
   infoText: {
-    flex: 1,
     fontSize: 18,
     lineHeight: 24,
-    fontFamily: 'VT323',
   },
   errorBox: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderRadius: 16,
     padding: 16,
     marginBottom: 20,
-    borderWidth: 2,
-    borderColor: '#FF6B6B',
-    borderTopColor: '#FFB3B3',
-    borderLeftColor: '#FFB3B3',
-    borderBottomColor: '#CC0000',
-    borderRightColor: '#CC0000',
+    borderWidth: 3,
   },
   errorText: {
-    flex: 1,
     fontSize: 18,
     lineHeight: 24,
     fontWeight: '400',
-    fontFamily: 'VT323',
   },
   successContainer: {
     alignItems: 'center',
-    paddingVertical: 40,
-    borderWidth: 2,
-    borderColor: '#A8E6CF',
-    borderTopColor: '#D4F5E9',
-    borderLeftColor: '#D4F5E9',
-    borderBottomColor: '#5CBFA8',
-    borderRightColor: '#5CBFA8',
-    marginHorizontal: 20,
-    borderRadius: 12,
-    paddingHorizontal: 20,
+    paddingVertical: 20,
+  },
+  successBox: {
+    padding: 24,
+    borderWidth: 3,
+    alignItems: 'center',
+    marginBottom: 20,
   },
   successText: {
-    fontSize: 28,
+    fontSize: 24,
     fontWeight: '400',
     textAlign: 'center',
-    marginBottom: 12,
-    fontFamily: 'VT323',
   },
   successSubtext: {
     fontSize: 20,
     textAlign: 'center',
-    marginBottom: 24,
-    fontFamily: 'VT323',
+    marginBottom: 16,
   },
   loadingDots: {
     flexDirection: 'row',
@@ -465,35 +482,43 @@ const styles = StyleSheet.create({
   dot: {
     width: 12,
     height: 12,
-    borderRadius: 6,
   },
-  dividerContainer: {
-    marginVertical: 24,
-    paddingHorizontal: 20,
-  },
-  dividerLine: {
-    height: 2,
-    borderRadius: 1,
-  },
-  backButton: {
+  pixelDivider: {
     flexDirection: 'row',
-    alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 16,
+    gap: 8,
+    marginVertical: 24,
+  },
+  pixel: {
+    width: 12,
+    height: 12,
+  },
+  // Back button with shadow
+  backShadowContainer: {
+    marginBottom: 20,
+    position: 'relative',
+  },
+  backShadow: {
+    position: 'absolute',
+    top: 4,
+    left: 4,
+    right: -4,
+    bottom: -4,
+    borderWidth: 3,
+    borderColor: '#000',
+  },
+  backButtonBox: {
+    padding: 16,
+    borderWidth: 3,
+    alignItems: 'center',
+    position: 'relative',
+    zIndex: 1,
   },
   backLink: {
     fontSize: 20,
     fontWeight: '400',
   },
-  decorativeBottom: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    gap: 12,
+  decorativeFooter: {
     marginTop: 20,
-  },
-  decorativeSquare: {
-    width: 16,
-    height: 16,
-    borderRadius: 4,
   },
 });
