@@ -2,7 +2,7 @@ import React, { useEffect } from 'react';
 import { View, TouchableOpacity, StyleSheet, Text } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
-import { SimpleVideoPlayer } from '@/components/VideoPlayerSimple';
+import { VideoPlayer } from '@/components/VideoPlayer';
 import { useEpisodeUpload } from '@/hooks/useEpisodeUpload';
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
@@ -46,9 +46,10 @@ export default function PlayerScreen() {
 
   return (
     <View style={styles.container}>
-      <SimpleVideoPlayer
+      <VideoPlayer
         videoUri={episode.videoUri}
         title={episode.title}
+        subtitles={episode.subtitles}
       />
       
       <TouchableOpacity 
