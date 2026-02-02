@@ -1,33 +1,39 @@
 /**
- * Sign Up Screen
+ * Sign Up Screen - Retro Comforting Design
  */
 
-import React, { useState, useCallback } from 'react';
-import {
-  StyleSheet,
-  View,
-  Text,
-  ScrollView,
-  TouchableOpacity,
-  KeyboardAvoidingView,
-  Platform,
-  Alert,
-} from 'react-native';
-import { useRouter } from 'expo-router';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { AuthButton } from '@/components/AuthButton';
+import { AuthInput } from '@/components/AuthInput';
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useAuth } from '@/hooks/useAuth';
-import { AuthInput } from '@/components/AuthInput';
-import { AuthButton } from '@/components/AuthButton';
-import { validateSignUp, parseAuthError } from '@/utils/validation';
+import { parseAuthError, validateSignUp } from '@/utils/validation';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { useFonts } from 'expo-font';
+import { useRouter } from 'expo-router';
+import React, { useCallback, useState } from 'react';
+import {
+  Alert,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 export default function SignUpScreen() {
   const router = useRouter();
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
   const { signUp } = useAuth();
+
+  // Load VT323 font
+  const [fontsLoaded] = useFonts({
+    'VT323': require('@/assets/fonts/VT323-Regular.ttf'),
+  });
 
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
@@ -66,6 +72,10 @@ export default function SignUpScreen() {
     }
   }, [name, email, password, confirmPassword, signUp, router]);
 
+  if (!fontsLoaded) {
+    return null;
+  }
+
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.retroBg }]}>
       <KeyboardAvoidingView
@@ -76,25 +86,43 @@ export default function SignUpScreen() {
           contentContainerStyle={styles.scrollContent}
           showsVerticalScrollIndicator={false}
         >
-          {/* Header with background card */}
-          <View style={[styles.headerCard, { backgroundColor: colors.retroPeach + '40' }]}>
-            <View style={[styles.iconContainer, { backgroundColor: colors.primary }]}>
+          {/* Retro Decorative Header */}
+          <View style={styles.decorativeHeader}>
+            <View style={styles.decorativeLine}>
+              <View style={[styles.lineSegment, { backgroundColor: colors.primary }]} />
+              <View style={[styles.lineSegment, { backgroundColor: colors.retroMint }]} />
+              <View style={[styles.lineSegment, { backgroundColor: colors.retroPeach }]} />
+            </View>
+          </View>
+
+          {/* Main Header Box */}
+          <View style={[styles.headerBox, { 
+            backgroundColor: colors.retroPeach,
+            borderColor: colors.retroBorder,
+          }]}>
+            <View style={[styles.iconBox, { 
+              backgroundColor: colors.primary,
+              borderColor: colors.retroBorder,
+            }]}>
               <MaterialCommunityIcons
-                name="account-plus"
-                size={50}
-                color="#fff"
+                name="star"
+                size={40}
+                color={colors.retroBg}
               />
             </View>
-            <Text style={[styles.title, { color: colors.primary }]}>
-              Create Account
+            <Text style={[styles.title, { color: colors.retroBorder, fontFamily: 'VT323' }]}>
+              START YOUR JOURNEY
             </Text>
-            <Text style={[styles.subtitle, { color: colors.text }]}>
-              Start your Japanese learning journey
+            <Text style={[styles.subtitle, { color: colors.retroBorder, fontFamily: 'VT323' }]}>
+              learn japanese together, step by step
             </Text>
           </View>
 
-          {/* Form Card */}
-          <View style={[styles.formCard, { backgroundColor: colors.surface, shadowColor: colors.primary }]}>
+          {/* Form Box */}
+          <View style={[styles.formBox, { 
+            backgroundColor: colors.retroLavender,
+            borderColor: colors.retroBorder,
+          }]}>
             <AuthInput
               label="Full Name"
               placeholder="John Doe"
@@ -120,7 +148,7 @@ export default function SignUpScreen() {
 
             <AuthInput
               label="Password"
-              placeholder="Min 8 chars, uppercase, number"
+              placeholder="Choose a strong password"
               value={password}
               onChangeText={setPassword}
               icon="lock"
@@ -131,7 +159,7 @@ export default function SignUpScreen() {
 
             <AuthInput
               label="Confirm Password"
-              placeholder="Re-enter your password"
+              placeholder="Type it again to be sure"
               value={confirmPassword}
               onChangeText={setConfirmPassword}
               icon="lock-check"
@@ -140,53 +168,87 @@ export default function SignUpScreen() {
               editable={!loading}
             />
 
-            {/* Password Requirements */}
-            <View style={[styles.requirementsContainer, { backgroundColor: colors.retroIndigo + '15' }]}>
-              <Text style={[styles.requirementsLabel, { color: colors.primary }]}>
-                Password Requirements:
+            {/* Password Tips Box */}
+            <View style={[styles.tipsBox, { 
+              backgroundColor: colors.accent,
+              borderColor: colors.retroBorder,
+            }]}>
+              <Text style={[styles.tipsTitle, { color: colors.retroBorder, fontFamily: 'VT323' }]}>
+                ▸ PASSWORD TIPS
               </Text>
-              <RequirementItem text="At least 8 characters" />
-              <RequirementItem text="1 uppercase letter (A-Z)" />
-              <RequirementItem text="1 lowercase letter (a-z)" />
-              <RequirementItem text="1 number (0-9)" />
+              <RequirementItem text="8+ characters" />
+              <RequirementItem text="uppercase & lowercase" />
+              <RequirementItem text="include a number" />
+            </View>
+
+            {/* Encouraging Message */}
+            <View style={[styles.encouragementBox, { 
+              backgroundColor: colors.retroMint,
+              borderColor: colors.retroBorder,
+            }]}>
+              <Text style={[styles.encouragementText, { color: colors.retroBorder, fontFamily: 'VT323' }]}>
+                ★ something amazing starts today 
+              </Text>
             </View>
 
             {/* Sign Up Button */}
             <AuthButton
-              label="Create Account"
+              label="CREATE ACCOUNT"
               onPress={handleSignUp}
               loading={loading}
               disabled={loading}
             />
           </View>
 
-          {/* Or Divider */}
-          <View style={styles.dividerContainer}>
-            <View style={[styles.dividerLine, { backgroundColor: colors.textSecondary + '30' }]} />
-            <Text style={[styles.dividerText, { color: colors.textSecondary }]}>
-              or
-            </Text>
-            <View style={[styles.dividerLine, { backgroundColor: colors.textSecondary + '30' }]} />
+          {/* Pixel Divider */}
+          <View style={styles.pixelDivider}>
+            <View style={[styles.pixel, { backgroundColor: colors.primary }]} />
+            <View style={[styles.pixel, { backgroundColor: colors.retroMint }]} />
+            <View style={[styles.pixel, { backgroundColor: colors.retroPeach }]} />
+            <View style={[styles.pixel, { backgroundColor: colors.retroLavender }]} />
+            <View style={[styles.pixel, { backgroundColor: colors.primary }]} />
           </View>
 
-          {/* Sign In Link Card */}
-          <View style={[styles.signInCard, { backgroundColor: colors.retroMint + '30', borderColor: colors.primary }]}>
-            <Text style={[styles.signInText, { color: colors.text }]}>
-              Already have an account?
+          {/* Sign In Box */}
+          <View style={[styles.signInBox, { 
+            backgroundColor: colors.retroMint,
+            borderColor: colors.retroBorder,
+          }]}>
+            <MaterialCommunityIcons
+              name="account-arrow-right"
+              size={36}
+              color={colors.retroBorder}
+              style={{ marginBottom: 8 }}
+            />
+            <Text style={[styles.signInText, { color: colors.retroBorder, fontFamily: 'VT323' }]}>
+              already part of our family?
             </Text>
             <TouchableOpacity
               onPress={() => router.replace('/(auth)/sign-in')}
               disabled={loading}
+              style={[styles.signInButtonBox, {
+                backgroundColor: colors.primary,
+                borderColor: colors.retroBorder,
+              }]}
             >
               <Text
                 style={[
                   styles.signInLink,
-                  { color: colors.primary, opacity: loading ? 0.5 : 1 },
+                  { color: '#FFFFFF', opacity: loading ? 0.5 : 1, fontFamily: 'VT323' },
                 ]}
               >
-                Sign In Instead →
+                SIGN IN HERE
               </Text>
             </TouchableOpacity>
+          </View>
+
+          {/* Decorative Footer */}
+          <View style={styles.decorativeFooter}>
+            <View style={styles.decorativeLine}>
+              <View style={[styles.lineSegment, { backgroundColor: colors.retroPeach }]} />
+              <View style={[styles.lineSegment, { backgroundColor: colors.retroMint }]} />
+              <View style={[styles.lineSegment, { backgroundColor: colors.primary }]} />
+            </View>
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
@@ -200,13 +262,10 @@ const RequirementItem: React.FC<{ text: string }> = ({ text }) => {
 
   return (
     <View style={styles.requirementItem}>
-      <MaterialCommunityIcons
-        name="check-circle"
-        size={16}
-        color={colors.primary}
-        style={{ marginRight: 8 }}
-      />
-      <Text style={[styles.requirementText, { color: colors.text }]}>
+      <Text style={[styles.bullet, { color: colors.retroBorder, fontFamily: 'VT323' }]}>
+        •
+      </Text>
+      <Text style={[styles.requirementText, { color: colors.retroBorder, fontFamily: 'VT323' }]}>
         {text}
       </Text>
     </View>
@@ -219,104 +278,157 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     flexGrow: 1,
-    paddingHorizontal: 16,
-    paddingVertical: 20,
-    justifyContent: 'space-between',
-  },
-  headerCard: {
-    alignItems: 'center',
-    marginBottom: 32,
-    paddingVertical: 32,
     paddingHorizontal: 20,
-    borderRadius: 16,
-    borderWidth: 2,
-    borderColor: '#9B59B6' + '20',
+    paddingVertical: 24,
   },
-  iconContainer: {
+  decorativeHeader: {
+    marginBottom: 20,
+  },
+  decorativeLine: {
+    flexDirection: 'row',
+    gap: 8,
+    justifyContent: 'center',
+  },
+  lineSegment: {
+    width: 60,
+    height: 4,
+  },
+  headerBox: {
+    alignItems: 'center',
+    marginBottom: 24,
+    paddingVertical: 32,
+    paddingHorizontal: 24,
+    borderWidth: 3,
+    borderColor: '#9B59B6',
+    borderTopColor: '#E1BEE7',
+    borderLeftColor: '#E1BEE7',
+    borderBottomColor: '#5A2D7A',
+    borderRightColor: '#5A2D7A',
+  },
+  iconBox: {
     width: 80,
     height: 80,
-    borderRadius: 40,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 8,
-    elevation: 5,
+    borderWidth: 3,
+    borderColor: '#9B59B6',
+    borderTopColor: '#E1BEE7',
+    borderLeftColor: '#E1BEE7',
+    borderBottomColor: '#5A2D7A',
+    borderRightColor: '#5A2D7A',
   },
   title: {
-    fontSize: 28,
-    fontWeight: '700',
+    fontSize: 38,
+    fontWeight: '400',
     marginBottom: 8,
     textAlign: 'center',
+    letterSpacing: 2,
+    textTransform: 'uppercase',
+    fontFamily: 'VT323',
   },
   subtitle: {
-    fontSize: 14,
+    fontSize: 20,
     textAlign: 'center',
-    lineHeight: 20,
+    lineHeight: 26,
+    fontFamily: 'VT323',
   },
-  formCard: {
-    borderRadius: 16,
+  formBox: {
+    borderWidth: 3,
+    borderColor: '#9B59B6',
+    borderTopColor: '#E1BEE7',
+    borderLeftColor: '#E1BEE7',
+    borderBottomColor: '#5A2D7A',
+    borderRightColor: '#5A2D7A',
     padding: 24,
     marginBottom: 24,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 12,
-    elevation: 3,
-    borderWidth: 1,
-    borderColor: '#E0E0E0',
   },
-  requirementsContainer: {
+  tipsBox: {
+    borderWidth: 3,
+    borderColor: '#FFB6D9',
+    borderTopColor: '#FFE0F0',
+    borderLeftColor: '#FFE0F0',
+    borderBottomColor: '#FF66B2',
+    borderRightColor: '#FF66B2',
+    padding: 16,
     marginBottom: 20,
-    paddingHorizontal: 12,
-    paddingVertical: 12,
-    borderRadius: 8,
-    borderLeftWidth: 4,
-    borderLeftColor: '#9B59B6',
   },
-  requirementsLabel: {
-    fontSize: 12,
-    fontWeight: '700',
-    marginBottom: 8,
+  tipsTitle: {
+    fontSize: 20,
+    fontWeight: '400',
+    marginBottom: 12,
+    fontFamily: 'VT323',
   },
   requirementItem: {
     flexDirection: 'row',
     alignItems: 'center',
     marginBottom: 6,
   },
+  bullet: {
+    fontSize: 20,
+    marginRight: 8,
+  },
   requirementText: {
-    fontSize: 12,
-    fontWeight: '500',
+    fontSize: 18,
+    fontWeight: '400',
+    fontFamily: 'VT323',
   },
-  dividerContainer: {
+  encouragementBox: {
+    alignItems: 'center',
+    marginBottom: 20,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    borderWidth: 3,
+    borderColor: '#FFB3D9',
+    borderTopColor: '#FFE0F0',
+    borderLeftColor: '#FFE0F0',
+    borderBottomColor: '#FF66B2',
+    borderRightColor: '#FF66B2',
+  },
+  encouragementText: {
+    fontSize: 18,
+    fontWeight: '400',
+    fontFamily: 'VT323',
+  },
+  pixelDivider: {
     flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 8,
+    marginVertical: 24,
+  },
+  pixel: {
+    width: 12,
+    height: 12,
+  },
+  signInBox: {
+    borderWidth: 3,
+    borderColor: '#7FE5DE',
+    borderTopColor: '#B2F5F1',
+    borderLeftColor: '#B2F5F1',
+    borderBottomColor: '#2BB8AE',
+    borderRightColor: '#2BB8AE',
+    padding: 24,
     alignItems: 'center',
-    marginVertical: 20,
-    gap: 12,
-  },
-  dividerLine: {
-    flex: 1,
-    height: 1,
-  },
-  dividerText: {
-    fontSize: 13,
-    fontWeight: '500',
-  },
-  signInCard: {
-    borderRadius: 16,
-    padding: 20,
-    borderWidth: 2,
-    alignItems: 'center',
+    marginBottom: 20,
   },
   signInText: {
-    fontSize: 14,
-    marginBottom: 8,
-    fontWeight: '500',
+    fontSize: 20,
+    marginBottom: 16,
+    fontWeight: '400',
+    fontFamily: 'VT323',
+  },
+  signInButtonBox: {
+    paddingVertical: 12,
+    paddingHorizontal: 32,
+    borderWidth: 3,
   },
   signInLink: {
-    fontSize: 15,
-    fontWeight: '700',
+    fontSize: 22,
+    fontWeight: '400',
+    letterSpacing: 1,
+    fontFamily: 'VT323',
+  },
+  decorativeFooter: {
+    marginTop: 20,
   },
 });

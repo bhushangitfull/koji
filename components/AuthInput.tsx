@@ -23,6 +23,9 @@ interface AuthInputProps extends TextInputProps {
   isPassword?: boolean;
   value: string;
   onChangeText: (text: string) => void;
+  labelColor?: string;
+  placeholderColor?: string;
+  iconColor?: string;
 }
 
 export const AuthInput: React.FC<AuthInputProps> = ({
@@ -33,6 +36,9 @@ export const AuthInput: React.FC<AuthInputProps> = ({
   value,
   onChangeText,
   placeholder,
+  labelColor,
+  placeholderColor,
+  iconColor,
   ...props
 }) => {
   const colorScheme = useColorScheme();
@@ -43,10 +49,14 @@ export const AuthInput: React.FC<AuthInputProps> = ({
     setIsPasswordVisible(!isPasswordVisible);
   };
 
+  const finalLabelColor = labelColor || colors.text;
+  const finalPlaceholderColor = placeholderColor || colors.textSecondary;
+  const finalIconColor = iconColor || colors.primary;
+
   return (
     <View style={styles.container}>
       {label && (
-        <Text style={[styles.label, { color: colors.text }]}>
+        <Text style={[styles.label, { color: finalLabelColor }]}>
           {label}
         </Text>
       )}
@@ -64,7 +74,7 @@ export const AuthInput: React.FC<AuthInputProps> = ({
           <MaterialCommunityIcons
             name={icon}
             size={20}
-            color={error ? '#FF6B6B' : colors.textSecondary}
+            color={error ? '#FF6B6B' : finalIconColor}
             style={styles.icon}
           />
         )}
@@ -77,7 +87,7 @@ export const AuthInput: React.FC<AuthInputProps> = ({
             },
           ]}
           placeholder={placeholder}
-          placeholderTextColor={colors.textSecondary}
+          placeholderTextColor={finalPlaceholderColor}
           secureTextEntry={isPassword && !isPasswordVisible}
           value={value}
           onChangeText={onChangeText}
@@ -92,7 +102,7 @@ export const AuthInput: React.FC<AuthInputProps> = ({
             <MaterialCommunityIcons
               name={isPasswordVisible ? 'eye' : 'eye-off'}
               size={20}
-              color={colors.textSecondary}
+              color={finalIconColor}
             />
           </TouchableOpacity>
         )}
@@ -113,8 +123,9 @@ const styles = StyleSheet.create({
   },
   label: {
     fontSize: 14,
-    fontWeight: '600',
+    fontWeight: '700',
     marginBottom: 8,
+    fontFamily: 'VT323',
   },
   inputWrapper: {
     flexDirection: 'row',
@@ -131,6 +142,7 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 16,
     paddingVertical: 12,
+    fontFamily: 'VT323',
   },
   eyeButton: {
     padding: 8,
@@ -140,5 +152,6 @@ const styles = StyleSheet.create({
     fontSize: 12,
     marginTop: 6,
     fontWeight: '500',
+    fontFamily: 'VT323',
   },
 });

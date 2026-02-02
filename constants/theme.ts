@@ -89,10 +89,10 @@ export const Fonts = Platform.select({
     mono: 'VT323',
   },
   default: {
-    sans: 'monospace',
-    serif: 'monospace',
-    rounded: 'monospace',
-    mono: 'monospace',
+    sans: 'VT323',
+    serif: 'VT323',
+    rounded: 'VT323',
+    mono: 'VT323',
   },
   web: {
     sans: "'VT323', monospace",
