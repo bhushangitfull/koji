@@ -19,9 +19,9 @@ export const env = {
 
   // JWT
   jwt: {
-    secret: process.env.JWT_SECRET || 'your_jwt_secret_key',
+    secret: process.env.JWT_SECRET || 'b1f3bd51f390d76125942280b21ff075fdb0412428729142ccc8e3ea06d4692b',
     expiresIn: process.env.JWT_EXPIRE || '7d',
-  },
+  } as { secret: string; expiresIn: string },
 
   // Redis
   redis: {

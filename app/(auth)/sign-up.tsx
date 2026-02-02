@@ -129,7 +129,6 @@ export default function SignUpScreen() {
               borderColor: colors.retroBorder,
             }]}>
               <AuthInput
-                label="Full Name"
                 placeholder="John Doe"
                 value={name}
                 onChangeText={setName}
@@ -140,7 +139,6 @@ export default function SignUpScreen() {
               />
 
               <AuthInput
-                label="Email Address"
                 placeholder="you@example.com"
                 value={email}
                 onChangeText={setEmail}
@@ -152,7 +150,6 @@ export default function SignUpScreen() {
               />
 
               <AuthInput
-                label="Password"
                 placeholder="Choose a strong password"
                 value={password}
                 onChangeText={setPassword}
@@ -192,7 +189,7 @@ export default function SignUpScreen() {
                 borderColor: colors.retroBorder,
               }]}>
                 <Text style={[styles.encouragementText, { color: colors.retroBorder, fontFamily: 'VT323' }]}>
-                  ★ something amazing starts today ★
+                  ★ something amazing starts today 
                 </Text>
               </View>
 

@@ -173,7 +173,7 @@ export default function SignInScreen() {
                 borderColor: colors.retroBorder,
               }]}>
                 <Text style={[styles.encouragementText, { color: colors.retroBorder, fontFamily: 'VT323' }]}>
-                  ★ every step forward is progress ★
+                  ★ every step forward is progress 
                 </Text>
               </View>
             </View>

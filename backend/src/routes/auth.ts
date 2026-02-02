@@ -44,10 +44,11 @@ router.post(
       const passwordHash = await bcrypt.hash(password, 10);
       const user = await UserModel.create(email, passwordHash, name);
 
+      // Fixed jwt.sign call
       const token = jwt.sign(
         { userId: user.id },
-        env.jwt.secret,
-        { expiresIn: env.jwt.expiresIn }
+        env.jwt.secret as jwt.Secret,
+        { expiresIn: env.jwt.expiresIn as any}
       );
 
       const response: ApiResponse<AuthResponse> = {
@@ -111,10 +112,11 @@ router.post(
         return;
       }
 
+      // Fixed jwt.sign call
       const token = jwt.sign(
         { userId: user.id },
-        env.jwt.secret,
-        { expiresIn: env.jwt.expiresIn }
+        env.jwt.secret as jwt.Secret,
+        { expiresIn: env.jwt.expiresIn as any}
       );
 
       const response: ApiResponse<AuthResponse> = {
