@@ -3,7 +3,7 @@
     "name": "Koji",
     "slug": "Koji",
     "version": "1.0.0",
-    "orientation": "portrait",
+    "orientation": "sensor",
     "icon": "./assets/images/mipmap-hdpi/ic_launcher.png",
     "scheme": "koji",
     "userInterfaceStyle": "automatic",
@@ -13,7 +13,8 @@
     },
     "android": {
       "edgeToEdgeEnabled": true,
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "screenOrientation": "sensor"
     },
     "web": {
       "favicon": "./assets/images/favicon.png"
