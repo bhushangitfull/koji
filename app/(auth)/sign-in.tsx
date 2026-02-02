@@ -1,5 +1,5 @@
 /**
- * Sign In Screen - Retro Comforting Design
+ * Sign In Screen - Retro Design with Offset Shadows
  */
 
 import { AuthButton } from '@/components/AuthButton';
@@ -88,84 +88,95 @@ export default function SignInScreen() {
             </View>
           </View>
 
-          {/* Main Header Box */}
-          <View style={[styles.headerBox, { 
-            backgroundColor: colors.retroLavender,
-            borderColor: colors.retroBorder,
-          }]}>
-            <View style={[styles.iconBox, { 
-              backgroundColor: colors.primary,
+          {/* Main Header Box with Shadow */}
+          <View style={styles.headerShadowContainer}>
+            <View style={[styles.headerShadow, { backgroundColor: colors.primary }]} />
+            <View style={[styles.headerBox, { 
+              backgroundColor: colors.retroLavender,
               borderColor: colors.retroBorder,
             }]}>
-              <MaterialCommunityIcons
-                name="heart"
-                size={40}
-                color={colors.retroBg}
-              />
+              <View style={[styles.iconBox, { 
+                backgroundColor: colors.primary,
+                borderColor: colors.retroBorder,
+              }]}>
+                <MaterialCommunityIcons
+                  name="heart"
+                  size={40}
+                  color={colors.retroBg}
+                />
+              </View>
+              <Text style={[styles.title, { color: colors.retroBorder, fontFamily: 'VT323' }]}>
+                WELCOME HOME
+              </Text>
+              <Text style={[styles.subtitle, { color: colors.retroBorder, fontFamily: 'VT323' }]}>
+                continue your japanese journey
+              </Text>
             </View>
-            <Text style={[styles.title, { color: colors.retroBorder, fontFamily: 'VT323' }]}>
-              WELCOME
-            </Text>
-            <Text style={[styles.subtitle, { color: colors.retroBorder, fontFamily: 'VT323' }]}>
-              continue your japanese journey
-            </Text>
           </View>
 
-          {/* Form Box */}
-          <View style={[styles.formBox, { 
-            backgroundColor: colors.retroPeach,
-            borderColor: colors.retroBorder,
-          }]}>
-            <AuthInput
-              label="Email Address"
-              placeholder="you@example.com"
-              value={email}
-              onChangeText={setEmail}
-              icon="email"
-              keyboardType="email-address"
-              autoCapitalize="none"
-              error={errors.email}
-              editable={!loading}
-              labelColor="#000"
-              placeholderColor="#fff"
-            />
+          {/* Form Box with Shadow */}
+          <View style={styles.formShadowContainer}>
+            <View style={[styles.formShadow, { backgroundColor: colors.primary }]} />
+            <View style={[styles.formBox, { 
+              backgroundColor: colors.retroPeach,
+              borderColor: colors.retroBorder,
+            }]}>
+              <AuthInput
+                placeholder="you@example.com"
+                value={email}
+                onChangeText={setEmail}
+                icon="email"
+                keyboardType="email-address"
+                autoCapitalize="none"
+                error={errors.email}
+                editable={!loading}
+                labelColor='#f000'
+              />
 
-            <AuthInput
-              label="Password"
-              placeholder="Enter your password"
-              value={password}
-              onChangeText={setPassword}
-              icon="lock"
-              isPassword
-              error={errors.password}
-              editable={!loading}
-              labelColor="#000"
-              placeholderColor="#fff"
-            />
+              <AuthInput
+                placeholder="Enter your password"
+                value={password}
+                onChangeText={setPassword}
+                icon="lock"
+                isPassword
+                error={errors.password}
+                editable={!loading}
+              />
 
-            {/* Forgot Password */}
-            <TouchableOpacity
-              onPress={() => router.push('/(auth)/forgot-password')}
-              disabled={loading}
-              style={styles.forgotPasswordButton}
-            >
-              <Text
-                style={[
-                  styles.forgotPassword,
-                  { color: colors.primary, opacity: loading ? 0.5 : 1, fontFamily: 'VT323' },
-                ]}
+              {/* Forgot Password */}
+              <TouchableOpacity
+                onPress={() => router.push('/(auth)/forgot-password')}
+                disabled={loading}
+                style={styles.forgotPasswordButton}
               >
-                forgot password?
-              </Text>
-            </TouchableOpacity>
+                <Text
+                  style={[
+                    styles.forgotPassword,
+                    { color: colors.primary, opacity: loading ? 0.5 : 1, fontFamily: 'VT323' },
+                  ]}
+                >
+                  forgot password?
+                </Text>
+              </TouchableOpacity>
 
-            {/* Sign In Button */}
-            <AuthButton
-              label="SIGN IN"
-              onPress={handleSignIn}
-              loading={loading}
-              disabled={loading}
-            />
+              {/* Sign In Button */}
+              <AuthButton
+                label="SIGN IN"
+                onPress={handleSignIn}
+                loading={loading}
+                disabled={loading}
+              />
+
+              {/* Encouraging Message */}
+              <View style={[styles.encouragementBox, { 
+                backgroundColor: colors.retroMint,
+                borderColor: colors.retroBorder,
+              }]}>
+                <Text style={[styles.encouragementText, { color: colors.retroBorder, fontFamily: 'VT323' }]}>
+                  ★ every step forward is progress ★
+                </Text>
+              </View>
+            </View>
           </View>
 
           {/* Pixel Divider */}
@@ -177,37 +188,40 @@ export default function SignInScreen() {
             <View style={[styles.pixel, { backgroundColor: colors.primary }]} />
           </View>
 
-          {/* Sign Up Box */}
-          <View style={[styles.signUpBox, { 
-            backgroundColor: colors.retroMint,
-            borderColor: colors.retroBorder,
-          }]}>
-            <MaterialCommunityIcons
-              name="account-plus"
-              size={36}
-              color={colors.retroBorder}
-              style={{ marginBottom: 8 }}
-            />
-            <Text style={[styles.signUpText, { color: colors.retroBorder, fontFamily: 'VT323' }]}>
-              new to our community?
-            </Text>
-            <TouchableOpacity
-              onPress={() => router.replace('/(auth)/sign-up')}
-              disabled={loading}
-              style={[styles.signUpButtonBox, {
-                backgroundColor: colors.primary,
-                borderColor: colors.retroBorder,
-              }]}
-            >
-              <Text
-                style={[
-                  styles.signUpLink,
-                  { color: '#FFFFFF', opacity: loading ? 0.5 : 1, fontFamily: 'VT323' },
-                ]}
-              >
-                JOIN US TODAY
+          {/* Sign Up Box with Shadow */}
+          <View style={styles.signUpShadowContainer}>
+            <View style={[styles.signUpShadow, { backgroundColor: colors.primary }]} />
+            <View style={[styles.signUpBox, { 
+              backgroundColor: colors.retroMint,
+              borderColor: colors.retroBorder,
+            }]}>
+              <MaterialCommunityIcons
+                name="account-plus"
+                size={36}
+                color={colors.retroBorder}
+                style={{ marginBottom: 8 }}
+              />
+              <Text style={[styles.signUpText, { color: colors.retroBorder, fontFamily: 'VT323' }]}>
+                new to our community?
               </Text>
-            </TouchableOpacity>
+              <TouchableOpacity
+                onPress={() => router.replace('/(auth)/sign-up')}
+                disabled={loading}
+                style={[styles.signUpButtonBox, {
+                  backgroundColor: colors.primary,
+                  borderColor: colors.retroBorder,
+                }]}
+              >
+                <Text
+                  style={[
+                    styles.signUpLink,
+                    { color: '#FFFFFF', opacity: loading ? 0.5 : 1, fontFamily: 'VT323' },
+                  ]}
+                >
+                  JOIN US TODAY
+                </Text>
+              </TouchableOpacity>
+            </View>
           </View>
 
           {/* Decorative Footer */}
@@ -245,17 +259,27 @@ const styles = StyleSheet.create({
     width: 60,
     height: 4,
   },
+  // Header with shadow
+  headerShadowContainer: {
+    marginBottom: 24,
+    position: 'relative',
+  },
+  headerShadow: {
+    position: 'absolute',
+    top: 6,
+    left: 6,
+    right: -6,
+    bottom: -6,
+    borderWidth: 3,
+    borderColor: '#000',
+  },
   headerBox: {
     alignItems: 'center',
-    marginBottom: 24,
     paddingVertical: 32,
     paddingHorizontal: 24,
     borderWidth: 3,
-    borderColor: '#9B59B6',
-    borderTopColor: '#E1BEE7',
-    borderLeftColor: '#E1BEE7',
-    borderBottomColor: '#5A2D7A',
-    borderRightColor: '#5A2D7A',
+    position: 'relative',
+    zIndex: 1,
   },
   iconBox: {
     width: 80,
@@ -264,11 +288,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginBottom: 16,
     borderWidth: 3,
-    borderColor: '#9B59B6',
-    borderTopColor: '#E1BEE7',
-    borderLeftColor: '#E1BEE7',
-    borderBottomColor: '#5A2D7A',
-    borderRightColor: '#5A2D7A',
   },
   title: {
     fontSize: 40,
@@ -277,23 +296,31 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     letterSpacing: 2,
     textTransform: 'uppercase',
-    fontFamily: 'VT323',
   },
   subtitle: {
     fontSize: 20,
     textAlign: 'center',
     lineHeight: 26,
-    fontFamily: 'VT323',
+  },
+  // Form with shadow
+  formShadowContainer: {
+    marginBottom: 24,
+    position: 'relative',
+  },
+  formShadow: {
+    position: 'absolute',
+    top: 6,
+    left: 6,
+    right: -6,
+    bottom: -6,
+    borderWidth: 3,
+    borderColor: '#000',
   },
   formBox: {
     borderWidth: 3,
-    borderColor: '#9B59B6',
-    borderTopColor: '#E1BEE7',
-    borderLeftColor: '#E1BEE7',
-    borderBottomColor: '#5A2D7A',
-    borderRightColor: '#5A2D7A',
     padding: 24,
-    marginBottom: 24,
+    position: 'relative',
+    zIndex: 1,
   },
   forgotPasswordButton: {
     marginBottom: 20,
@@ -303,7 +330,6 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '400',
     textAlign: 'right',
-    fontFamily: 'VT323',
   },
   encouragementBox: {
     alignItems: 'center',
@@ -311,16 +337,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 14,
     borderWidth: 3,
-    borderColor: '#FFB3D9',
-    borderTopColor: '#FFE0F0',
-    borderLeftColor: '#FFE0F0',
-    borderBottomColor: '#FF66B2',
-    borderRightColor: '#FF66B2',
   },
   encouragementText: {
     fontSize: 18,
     fontWeight: '400',
-    fontFamily: 'VT323',
   },
   pixelDivider: {
     flexDirection: 'row',
@@ -332,22 +352,31 @@ const styles = StyleSheet.create({
     width: 12,
     height: 12,
   },
+  // Sign up box with shadow
+  signUpShadowContainer: {
+    marginBottom: 20,
+    position: 'relative',
+  },
+  signUpShadow: {
+    position: 'absolute',
+    top: 6,
+    left: 6,
+    right: 6,
+    bottom: 6,
+    borderWidth: 3,
+    borderColor: '#000',
+  },
   signUpBox: {
     borderWidth: 3,
-    borderColor: '#7FE5DE',
-    borderTopColor: '#B2F5F1',
-    borderLeftColor: '#B2F5F1',
-    borderBottomColor: '#2BB8AE',
-    borderRightColor: '#2BB8AE',
     padding: 24,
     alignItems: 'center',
-    marginBottom: 20,
+    position: 'relative',
+    zIndex: 1,
   },
   signUpText: {
     fontSize: 20,
     marginBottom: 16,
     fontWeight: '400',
-    fontFamily: 'VT323',
   },
   signUpButtonBox: {
     paddingVertical: 12,
@@ -358,7 +387,6 @@ const styles = StyleSheet.create({
     fontSize: 22,
     fontWeight: '400',
     letterSpacing: 1,
-    fontFamily: 'VT323',
   },
   decorativeFooter: {
     marginTop: 20,

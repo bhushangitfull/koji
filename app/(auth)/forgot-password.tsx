@@ -137,7 +137,7 @@ export default function ForgotPasswordScreen() {
               <MaterialCommunityIcons
                 name={step === 'success' ? 'check-circle' : 'lock-reset'}
                 size={44}
-                color="#fff"
+                color="success" 
               />
             </View>
             <Text style={[styles.title, { color: colors.primary, fontFamily: 'VT323' }]}>
@@ -155,7 +155,6 @@ export default function ForgotPasswordScreen() {
             {step === 'email' && (
               <>
                 <AuthInput
-                  label="Email Address"
                   placeholder="you@example.com"
                   value={email}
                   onChangeText={setEmail}
@@ -172,7 +171,7 @@ export default function ForgotPasswordScreen() {
                     color={colors.primary}
                     style={{ marginRight: 10 }}
                   />
-                  <Text style={[styles.infoText, { color: colors.text, fontFamily: 'VT323' }]}>
+                  <Text style={[styles.infoText, { color: colors.primary, fontFamily: 'VT323' }]}>
                     We'll send a reset link to your email
                   </Text>
                 </View>
@@ -286,7 +285,7 @@ export default function ForgotPasswordScreen() {
                     setConfirmPassword('');
                     setError(null);
                   } else {
-                    router.back();
+                    router.replace('/(auth)/sign-in');
                   }
                 }}
                 disabled={loading}

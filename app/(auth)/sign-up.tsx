@@ -1,5 +1,5 @@
 /**
- * Sign Up Screen - Retro Comforting Design
+ * Forgot Password Screen - Retro Design with Offset Shadows
  */
 
 import { AuthButton } from '@/components/AuthButton';
@@ -7,7 +7,7 @@ import { AuthInput } from '@/components/AuthInput';
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useAuth } from '@/hooks/useAuth';
-import { parseAuthError, validateSignUp } from '@/utils/validation';
+import { parseAuthError, validateEmail } from '@/utils/validation';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useFonts } from 'expo-font';
 import { useRouter } from 'expo-router';
@@ -24,57 +24,107 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-export default function SignUpScreen() {
+type ForgotPasswordStep = 'email' | 'reset' | 'success';
+
+export default function ForgotPasswordScreen() {
   const router = useRouter();
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
-  const { signUp } = useAuth();
+  const { forgotPassword, resetPassword } = useAuth();
 
   // Load VT323 font
   const [fontsLoaded] = useFonts({
     'VT323': require('@/assets/fonts/VT323-Regular.ttf'),
   });
 
-  const [name, setName] = useState('');
+  const [step, setStep] = useState<ForgotPasswordStep>('email');
   const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+  const [resetToken, setResetToken] = useState('');
+  const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [loading, setLoading] = useState(false);
-  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [error, setError] = useState<string | null>(null);
 
-  const handleSignUp = useCallback(async () => {
+  const handleRequestReset = useCallback(async () => {
     try {
-      // Validate form
-      const validation = validateSignUp(email, password, confirmPassword, name);
+      const validation = validateEmail(email);
       if (!validation.valid) {
-        setErrors(validation.errors);
+        setError(validation.error || 'Invalid email');
         return;
       }
 
-      setErrors({});
+      setError(null);
       setLoading(true);
 
-      // Sign up
-      await signUp({
-        name,
-        email,
-        password,
-        jlptLevel: 'N5',
-      });
+      await forgotPassword({ email });
 
-      // Navigate to home
-      router.replace('/(tabs)');
-    } catch (error: any) {
-      const errorMessage = parseAuthError(error);
-      Alert.alert('Sign Up Failed', errorMessage);
+      // Show success message
+      setStep('reset');
+      Alert.alert(
+        'Check Your Email',
+        'We sent a password reset link to your email. Please check your inbox and follow the instructions.'
+      );
+    } catch (err: any) {
+      setError(parseAuthError(err));
     } finally {
       setLoading(false);
     }
-  }, [name, email, password, confirmPassword, signUp, router]);
+  }, [email, forgotPassword]);
+
+  const handleResetPassword = useCallback(async () => {
+    try {
+      if (!resetToken.trim()) {
+        setError('Please enter the reset code from your email');
+        return;
+      }
+
+      if (newPassword !== confirmPassword) {
+        setError('Passwords do not match');
+        return;
+      }
+
+      if (newPassword.length < 8) {
+        setError('Password must be at least 8 characters');
+        return;
+      }
+
+      setError(null);
+      setLoading(true);
+
+      await resetPassword({
+        token: resetToken,
+        newPassword,
+      });
+
+      setStep('success');
+      Alert.alert('Success', 'Your password has been reset. You can now sign in with your new password.');
+
+      // Redirect to sign in after 2 seconds
+      setTimeout(() => {
+        router.replace('/(auth)/sign-in');
+      }, 2000);
+    } catch (err: any) {
+      setError(parseAuthError(err));
+    } finally {
+      setLoading(false);
+    }
+  }, [resetToken, newPassword, confirmPassword, resetPassword, router]);
 
   if (!fontsLoaded) {
     return null;
   }
+
+  const getHeaderColor = () => {
+    if (step === 'email') return colors.retroPeach;
+    if (step === 'reset') return colors.retroLavender;
+    return colors.retroMint;
+  };
+
+  const getFormColor = () => {
+    if (step === 'email') return colors.retroLavender;
+    if (step === 'reset') return colors.retroPeach;
+    return colors.accent;
+  };
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.retroBg }]}>
@@ -90,163 +140,209 @@ export default function SignUpScreen() {
           <View style={styles.decorativeHeader}>
             <View style={styles.decorativeLine}>
               <View style={[styles.lineSegment, { backgroundColor: colors.primary }]} />
-              <View style={[styles.lineSegment, { backgroundColor: colors.retroMint }]} />
+              <View style={[styles.lineSegment, { backgroundColor: colors.retroLavender }]} />
               <View style={[styles.lineSegment, { backgroundColor: colors.retroPeach }]} />
             </View>
           </View>
 
-          {/* Main Header Box */}
-          <View style={[styles.headerBox, { 
-            backgroundColor: colors.retroPeach,
-            borderColor: colors.retroBorder,
-          }]}>
-            <View style={[styles.iconBox, { 
-              backgroundColor: colors.primary,
+          {/* Main Header Box with Shadow */}
+          <View style={styles.headerShadowContainer}>
+            <View style={[styles.headerShadow, { backgroundColor: colors.primary }]} />
+            <View style={[styles.headerBox, { 
+              backgroundColor: getHeaderColor(),
               borderColor: colors.retroBorder,
             }]}>
-              <MaterialCommunityIcons
-                name="star"
-                size={40}
-                color={colors.retroBg}
-              />
-            </View>
-            <Text style={[styles.title, { color: colors.retroBorder, fontFamily: 'VT323' }]}>
-              START YOUR JOURNEY
-            </Text>
-            <Text style={[styles.subtitle, { color: colors.retroBorder, fontFamily: 'VT323' }]}>
-              learn japanese together, step by step
-            </Text>
-          </View>
-
-          {/* Form Box */}
-          <View style={[styles.formBox, { 
-            backgroundColor: colors.retroLavender,
-            borderColor: colors.retroBorder,
-          }]}>
-            <AuthInput
-              label="Full Name"
-              placeholder="John Doe"
-              value={name}
-              onChangeText={setName}
-              icon="account"
-              autoCapitalize="words"
-              error={errors.name}
-              editable={!loading}
-            />
-
-            <AuthInput
-              label="Email Address"
-              placeholder="you@example.com"
-              value={email}
-              onChangeText={setEmail}
-              icon="email"
-              keyboardType="email-address"
-              autoCapitalize="none"
-              error={errors.email}
-              editable={!loading}
-            />
-
-            <AuthInput
-              label="Password"
-              placeholder="Choose a strong password"
-              value={password}
-              onChangeText={setPassword}
-              icon="lock"
-              isPassword
-              error={errors.password}
-              editable={!loading}
-            />
-
-            <AuthInput
-              label="Confirm Password"
-              placeholder="Type it again to be sure"
-              value={confirmPassword}
-              onChangeText={setConfirmPassword}
-              icon="lock-check"
-              isPassword
-              error={errors.confirmPassword}
-              editable={!loading}
-            />
-
-            {/* Password Tips Box */}
-            <View style={[styles.tipsBox, { 
-              backgroundColor: colors.accent,
-              borderColor: colors.retroBorder,
-            }]}>
-              <Text style={[styles.tipsTitle, { color: colors.retroBorder, fontFamily: 'VT323' }]}>
-                ▸ PASSWORD TIPS
-              </Text>
-              <RequirementItem text="8+ characters" />
-              <RequirementItem text="uppercase & lowercase" />
-              <RequirementItem text="include a number" />
-            </View>
-
-            {/* Encouraging Message */}
-            <View style={[styles.encouragementBox, { 
-              backgroundColor: colors.retroMint,
-              borderColor: colors.retroBorder,
-            }]}>
-              <Text style={[styles.encouragementText, { color: colors.retroBorder, fontFamily: 'VT323' }]}>
-                ★ something amazing starts today 
-              </Text>
-            </View>
-
-            {/* Sign Up Button */}
-            <AuthButton
-              label="CREATE ACCOUNT"
-              onPress={handleSignUp}
-              loading={loading}
-              disabled={loading}
-            />
-          </View>
-
-          {/* Pixel Divider */}
-          <View style={styles.pixelDivider}>
-            <View style={[styles.pixel, { backgroundColor: colors.primary }]} />
-            <View style={[styles.pixel, { backgroundColor: colors.retroMint }]} />
-            <View style={[styles.pixel, { backgroundColor: colors.retroPeach }]} />
-            <View style={[styles.pixel, { backgroundColor: colors.retroLavender }]} />
-            <View style={[styles.pixel, { backgroundColor: colors.primary }]} />
-          </View>
-
-          {/* Sign In Box */}
-          <View style={[styles.signInBox, { 
-            backgroundColor: colors.retroMint,
-            borderColor: colors.retroBorder,
-          }]}>
-            <MaterialCommunityIcons
-              name="account-arrow-right"
-              size={36}
-              color={colors.retroBorder}
-              style={{ marginBottom: 8 }}
-            />
-            <Text style={[styles.signInText, { color: colors.retroBorder, fontFamily: 'VT323' }]}>
-              already part of our family?
-            </Text>
-            <TouchableOpacity
-              onPress={() => router.replace('/(auth)/sign-in')}
-              disabled={loading}
-              style={[styles.signInButtonBox, {
+              <View style={[styles.iconBox, { 
                 backgroundColor: colors.primary,
                 borderColor: colors.retroBorder,
-              }]}
-            >
-              <Text
-                style={[
-                  styles.signInLink,
-                  { color: '#FFFFFF', opacity: loading ? 0.5 : 1, fontFamily: 'VT323' },
-                ]}
-              >
-                SIGN IN HERE
+              }]}>
+                <MaterialCommunityIcons
+                  name={step === 'success' ? 'check' : 'lock-reset'}
+                  size={40}
+                  color={colors.retroBg}
+                />
+              </View>
+              <Text style={[styles.title, { color: colors.retroBorder, fontFamily: 'VT323' }]}>
+                {step === 'success' ? 'ALL SET!' : 'PASSWORD RESET'}
               </Text>
-            </TouchableOpacity>
+              <Text style={[styles.subtitle, { color: colors.retroBorder, fontFamily: 'VT323' }]}>
+                {step === 'email' && 'no worries, we\'ll help you'}
+                {step === 'reset' && 'create a new password'}
+                {step === 'success' && 'ready to continue learning!'}
+              </Text>
+            </View>
           </View>
+
+          {/* Form Box with Shadow */}
+          <View style={styles.formShadowContainer}>
+            <View style={[styles.formShadow, { backgroundColor: colors.primary }]} />
+            <View style={[styles.formBox, { 
+              backgroundColor: getFormColor(),
+              borderColor: colors.retroBorder,
+            }]}>
+              {step === 'email' && (
+                <>
+                  <AuthInput
+                    label="Email Address"
+                    placeholder="you@example.com"
+                    value={email}
+                    onChangeText={setEmail}
+                    icon="email"
+                    keyboardType="email-address"
+                    autoCapitalize="none"
+                    editable={!loading}
+                  />
+
+                  <View style={[styles.infoBox, { 
+                    backgroundColor: colors.retroMint,
+                    borderColor: colors.retroBorder,
+                  }]}>
+                    <Text style={[styles.infoText, { color: colors.retroBorder, fontFamily: 'VT323' }]}>
+                      ▸ we'll send a reset link to your email
+                    </Text>
+                  </View>
+                </>
+              )}
+
+              {step === 'reset' && (
+                <>
+                  <AuthInput
+                    label="Reset Code"
+                    placeholder="Enter code from email"
+                    value={resetToken}
+                    onChangeText={setResetToken}
+                    icon="key"
+                    editable={!loading}
+                  />
+
+                  <AuthInput
+                    label="New Password"
+                    placeholder="Choose a new password"
+                    value={newPassword}
+                    onChangeText={setNewPassword}
+                    icon="lock"
+                    isPassword
+                    editable={!loading}
+                  />
+
+                  <AuthInput
+                    label="Confirm Password"
+                    placeholder="Type it again to be sure"
+                    value={confirmPassword}
+                    onChangeText={setConfirmPassword}
+                    icon="lock-check"
+                    isPassword
+                    editable={!loading}
+                  />
+
+                  <View style={[styles.infoBox, { 
+                    backgroundColor: colors.retroMint,
+                    borderColor: colors.retroBorder,
+                  }]}>
+                    <Text style={[styles.infoText, { color: colors.retroBorder, fontFamily: 'VT323' }]}>
+                      ▸ make it strong and memorable!
+                    </Text>
+                  </View>
+                </>
+              )}
+
+              {step === 'success' && (
+                <View style={styles.successContainer}>
+                  <View style={[styles.successBox, {
+                    backgroundColor: colors.primary,
+                    borderColor: colors.retroBorder,
+                  }]}>
+                    <MaterialCommunityIcons
+                      name="check-circle"
+                      size={64}
+                      color="#FFFFFF"
+                      style={{ marginBottom: 16 }}
+                    />
+                    <Text style={[styles.successText, { color: '#FFFFFF', fontFamily: 'VT323' }]}>
+                      PASSWORD RESET COMPLETE!
+                    </Text>
+                  </View>
+                  <Text style={[styles.successSubtext, { color: colors.retroBorder, fontFamily: 'VT323' }]}>
+                    taking you to sign in...
+                  </Text>
+                  <View style={styles.loadingDots}>
+                    <View style={[styles.dot, { backgroundColor: colors.primary }]} />
+                    <View style={[styles.dot, { backgroundColor: colors.primary }]} />
+                    <View style={[styles.dot, { backgroundColor: colors.primary }]} />
+                  </View>
+                </View>
+              )}
+
+              {error && (
+                <View style={[styles.errorBox, { 
+                  backgroundColor: '#FFE5E5',
+                  borderColor: '#FF6B6B',
+                }]}>
+                  <Text style={[styles.errorText, { color: '#FF6B6B', fontFamily: 'VT323' }]}>
+                    ✕ {error}
+                  </Text>
+                </View>
+              )}
+
+              {step !== 'success' && (
+                <AuthButton
+                  label={step === 'email' ? 'SEND RESET LINK' : 'RESET PASSWORD'}
+                  onPress={step === 'email' ? handleRequestReset : handleResetPassword}
+                  loading={loading}
+                  disabled={loading}
+                />
+              )}
+            </View>
+          </View>
+
+          {/* Back Link */}
+          {step !== 'success' && (
+            <>
+              <View style={styles.pixelDivider}>
+                <View style={[styles.pixel, { backgroundColor: colors.primary }]} />
+                <View style={[styles.pixel, { backgroundColor: colors.retroPeach }]} />
+                <View style={[styles.pixel, { backgroundColor: colors.primary }]} />
+              </View>
+              
+              <View style={styles.backShadowContainer}>
+                <View style={[styles.backShadow, { backgroundColor: colors.primary }]} />
+                <TouchableOpacity
+                  onPress={() => {
+                    if (step === 'reset') {
+                      setStep('email');
+                      setEmail('');
+                      setResetToken('');
+                      setNewPassword('');
+                      setConfirmPassword('');
+                      setError(null);
+                    } else {
+                      router.back();
+                    }
+                  }}
+                  disabled={loading}
+                  style={[styles.backButtonBox, {
+                    backgroundColor: colors.retroMint,
+                    borderColor: colors.retroBorder,
+                  }]}
+                >
+                  <Text
+                    style={[
+                      styles.backLink,
+                      { color: colors.retroBorder, opacity: loading ? 0.5 : 1, fontFamily: 'VT323' },
+                    ]}
+                  >
+                    ← BACK TO {step === 'reset' ? 'EMAIL' : 'SIGN IN'}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </>
+          )}
 
           {/* Decorative Footer */}
           <View style={styles.decorativeFooter}>
             <View style={styles.decorativeLine}>
-              <View style={[styles.lineSegment, { backgroundColor: colors.retroPeach }]} />
               <View style={[styles.lineSegment, { backgroundColor: colors.retroMint }]} />
+              <View style={[styles.lineSegment, { backgroundColor: colors.retroPeach }]} />
               <View style={[styles.lineSegment, { backgroundColor: colors.primary }]} />
             </View>
           </View>
@@ -255,22 +351,6 @@ export default function SignUpScreen() {
     </SafeAreaView>
   );
 }
-
-const RequirementItem: React.FC<{ text: string }> = ({ text }) => {
-  const colorScheme = useColorScheme();
-  const colors = Colors[colorScheme ?? 'light'];
-
-  return (
-    <View style={styles.requirementItem}>
-      <Text style={[styles.bullet, { color: colors.retroBorder, fontFamily: 'VT323' }]}>
-        •
-      </Text>
-      <Text style={[styles.requirementText, { color: colors.retroBorder, fontFamily: 'VT323' }]}>
-        {text}
-      </Text>
-    </View>
-  );
-};
 
 const styles = StyleSheet.create({
   container: {
@@ -293,17 +373,27 @@ const styles = StyleSheet.create({
     width: 60,
     height: 4,
   },
+  // Header with shadow
+  headerShadowContainer: {
+    marginBottom: 24,
+    position: 'relative',
+  },
+  headerShadow: {
+    position: 'absolute',
+    top: 6,
+    left: 6,
+    right: -6,
+    bottom: -6,
+    borderWidth: 3,
+    borderColor: '#000',
+  },
   headerBox: {
     alignItems: 'center',
-    marginBottom: 24,
     paddingVertical: 32,
     paddingHorizontal: 24,
     borderWidth: 3,
-    borderColor: '#9B59B6',
-    borderTopColor: '#E1BEE7',
-    borderLeftColor: '#E1BEE7',
-    borderBottomColor: '#5A2D7A',
-    borderRightColor: '#5A2D7A',
+    position: 'relative',
+    zIndex: 1,
   },
   iconBox: {
     width: 80,
@@ -312,83 +402,86 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginBottom: 16,
     borderWidth: 3,
-    borderColor: '#9B59B6',
-    borderTopColor: '#E1BEE7',
-    borderLeftColor: '#E1BEE7',
-    borderBottomColor: '#5A2D7A',
-    borderRightColor: '#5A2D7A',
   },
   title: {
-    fontSize: 38,
+    fontSize: 40,
     fontWeight: '400',
     marginBottom: 8,
     textAlign: 'center',
     letterSpacing: 2,
     textTransform: 'uppercase',
-    fontFamily: 'VT323',
   },
   subtitle: {
     fontSize: 20,
     textAlign: 'center',
     lineHeight: 26,
-    fontFamily: 'VT323',
+  },
+  // Form with shadow
+  formShadowContainer: {
+    marginBottom: 24,
+    position: 'relative',
+  },
+  formShadow: {
+    position: 'absolute',
+    top: 6,
+    left: 6,
+    right: -6,
+    bottom: -6,
+    borderWidth: 3,
+    borderColor: '#000',
   },
   formBox: {
     borderWidth: 3,
-    borderColor: '#9B59B6',
-    borderTopColor: '#E1BEE7',
-    borderLeftColor: '#E1BEE7',
-    borderBottomColor: '#5A2D7A',
-    borderRightColor: '#5A2D7A',
     padding: 24,
-    marginBottom: 24,
+    position: 'relative',
+    zIndex: 1,
   },
-  tipsBox: {
-    borderWidth: 3,
-    borderColor: '#FFB6D9',
-    borderTopColor: '#FFE0F0',
-    borderLeftColor: '#FFE0F0',
-    borderBottomColor: '#FF66B2',
-    borderRightColor: '#FF66B2',
+  infoBox: {
     padding: 16,
     marginBottom: 20,
+    borderWidth: 3,
   },
-  tipsTitle: {
-    fontSize: 20,
-    fontWeight: '400',
-    marginBottom: 12,
-    fontFamily: 'VT323',
-  },
-  requirementItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 6,
-  },
-  bullet: {
-    fontSize: 20,
-    marginRight: 8,
-  },
-  requirementText: {
+  infoText: {
     fontSize: 18,
-    fontWeight: '400',
-    fontFamily: 'VT323',
+    lineHeight: 24,
   },
-  encouragementBox: {
+  errorBox: {
+    padding: 16,
+    marginBottom: 20,
+    borderWidth: 3,
+  },
+  errorText: {
+    fontSize: 18,
+    lineHeight: 24,
+    fontWeight: '400',
+  },
+  successContainer: {
+    alignItems: 'center',
+    paddingVertical: 20,
+  },
+  successBox: {
+    padding: 24,
+    borderWidth: 3,
     alignItems: 'center',
     marginBottom: 20,
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    borderWidth: 3,
-    borderColor: '#FFB3D9',
-    borderTopColor: '#FFE0F0',
-    borderLeftColor: '#FFE0F0',
-    borderBottomColor: '#FF66B2',
-    borderRightColor: '#FF66B2',
   },
-  encouragementText: {
-    fontSize: 18,
+  successText: {
+    fontSize: 24,
     fontWeight: '400',
-    fontFamily: 'VT323',
+    textAlign: 'center',
+  },
+  successSubtext: {
+    fontSize: 20,
+    textAlign: 'center',
+    marginBottom: 16,
+  },
+  loadingDots: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  dot: {
+    width: 12,
+    height: 12,
   },
   pixelDivider: {
     flexDirection: 'row',
@@ -400,33 +493,30 @@ const styles = StyleSheet.create({
     width: 12,
     height: 12,
   },
-  signInBox: {
-    borderWidth: 3,
-    borderColor: '#7FE5DE',
-    borderTopColor: '#B2F5F1',
-    borderLeftColor: '#B2F5F1',
-    borderBottomColor: '#2BB8AE',
-    borderRightColor: '#2BB8AE',
-    padding: 24,
-    alignItems: 'center',
+  // Back button with shadow
+  backShadowContainer: {
     marginBottom: 20,
+    position: 'relative',
   },
-  signInText: {
-    fontSize: 20,
-    marginBottom: 16,
-    fontWeight: '400',
-    fontFamily: 'VT323',
-  },
-  signInButtonBox: {
-    paddingVertical: 12,
-    paddingHorizontal: 32,
+  backShadow: {
+    position: 'absolute',
+    top: 4,
+    left: 4,
+    right: -4,
+    bottom: -4,
     borderWidth: 3,
+    borderColor: '#000',
   },
-  signInLink: {
-    fontSize: 22,
+  backButtonBox: {
+    padding: 16,
+    borderWidth: 3,
+    alignItems: 'center',
+    position: 'relative',
+    zIndex: 1,
+  },
+  backLink: {
+    fontSize: 20,
     fontWeight: '400',
-    letterSpacing: 1,
-    fontFamily: 'VT323',
   },
   decorativeFooter: {
     marginTop: 20,
