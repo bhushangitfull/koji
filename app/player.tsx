@@ -1,11 +1,12 @@
-import React, { useEffect } from 'react';
-import { View, TouchableOpacity, StyleSheet, Text } from 'react-native';
-import { useLocalSearchParams, useRouter } from 'expo-router';
-import { Feather } from '@expo/vector-icons';
-import { VideoPlayer } from '@/components/VideoPlayer';
-import { useEpisodeUpload } from '@/hooks/useEpisodeUpload';
+ import { VideoPlayer } from '@/components/VideoPlayer';
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { useEpisodeUpload } from '@/hooks/useEpisodeUpload';
+import { Feather } from '@expo/vector-icons';
+import { useLocalSearchParams, useRouter } from 'expo-router';
+import * as ScreenOrientation from 'expo-screen-orientation';
+import React, { useEffect } from 'react';
+import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 export default function PlayerScreen() {
   const colorScheme = useColorScheme();
@@ -14,12 +15,43 @@ export default function PlayerScreen() {
   const { episodeId } = useLocalSearchParams<{ episodeId: string }>();
   const { episodes } = useEpisodeUpload();
 
+  // Lock orientation to portrait when entering this screen
+  useEffect(() => {
+    const setupOrientation = async () => {
+      try {
+        await ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP);
+      } catch (err) {
+        console.error('Error setting orientation:', err);
+      }
+    };
+    
+    setupOrientation();
+
+    // Cleanup: ensure portrait orientation when leaving this screen
+    return () => {
+      ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP).catch(err => {
+        console.error('Error restoring orientation on unmount:', err);
+      });
+    };
+  }, []);
+
   useEffect(() => {
     console.log('Player screen - episodeId:', episodeId);
     console.log('Player screen - episodes:', episodes.map(e => ({ id: e.id, title: e.title, uri: e.videoUri })));
   }, [episodeId, episodes]);
 
   const episode = episodes.find((e) => e.id === episodeId);
+
+  const handleBack = async () => {
+    try {
+      // Ensure portrait before navigating back
+      await ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP);
+      router.back();
+    } catch (err) {
+      console.error('Error on back:', err);
+      router.back();
+    }
+  };
 
   if (!episode) {
     return (
@@ -34,7 +66,7 @@ export default function PlayerScreen() {
         </View>
         <TouchableOpacity 
           style={styles.backButton}
-          onPress={() => router.back()}
+          onPress={handleBack}
         >
           <Feather name="x" size={28} color="white" />
         </TouchableOpacity>
@@ -54,7 +86,7 @@ export default function PlayerScreen() {
       
       <TouchableOpacity 
         style={styles.backButton}
-        onPress={() => router.back()}
+        onPress={handleBack}
       >
         <Feather name="x" size={28} color="white" />
       </TouchableOpacity>

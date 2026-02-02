@@ -15,13 +15,15 @@ import { Ionicons } from '@expo/vector-icons';
 import * as ScreenOrientation from 'expo-screen-orientation';
 import { Subtitle, getSubtitleAtTime } from '@/utils/subtitleParser';
 
-const { width, height } = Dimensions.get('window');
+const { width: screenWidth } = Dimensions.get('window');
 
 interface VideoPlayerProps {
   videoUri: string;
   subtitles?: Subtitle[];
   onTimeUpdate?: (currentTime: number) => void;
   title?: string;
+  onBack?: () => void;
+  onTextSelect?: (text: string) => void;
 }
 
 interface WordDefinition {
@@ -35,12 +37,14 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
   subtitles = [],
   onTimeUpdate,
   title,
+  onBack,
+  onTextSelect,
 }) => {
   const player = useVideoPlayer(videoUri, (player) => {
     player.loop = false;
   });
 
-  // State
+  // State Management
   const [isPlayerReady, setIsPlayerReady] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
@@ -52,12 +56,15 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
   const [playerError, setPlayerError] = useState<string | null>(null);
   const [isSeeking, setIsSeeking] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [showSubtitles, setShowSubtitles] = useState(true);
+  const [subtitleOffset, setSubtitleOffset] = useState(0);
+  const [selectedText, setSelectedText] = useState('');
 
   // Refs
   const controlsTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const updateIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  // Setup time tracking interval
+  // Setup time tracking
   useEffect(() => {
     if (!isPlayerReady || !player) return;
 
@@ -66,7 +73,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
         if (!isSeeking) {
           const currentTime = player.currentTime || 0;
           const duration = player.duration || 0;
-          
+
           setCurrentTime(currentTime * 1000); // Convert to ms
           if (duration > 0) {
             setDuration(duration * 1000); // Convert to ms
@@ -95,7 +102,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
     }
   }, [isPlayerReady]);
 
-  // Reset on URI change
+  // Reset on video change
   useEffect(() => {
     setIsPlayerReady(false);
     setIsPlaying(false);
@@ -107,15 +114,31 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
   // Update subtitles
   useEffect(() => {
     if (subtitles.length > 0) {
-      const subtitle = getSubtitleAtTime(subtitles, currentTime);
+      const subtitle = getSubtitleAtTime(subtitles, currentTime + subtitleOffset * 1000);
       setCurrentSubtitle(subtitle || null);
     }
-  }, [currentTime, subtitles]);
+  }, [currentTime, subtitles, subtitleOffset]);
 
   // Callback
   useEffect(() => {
     onTimeUpdate?.(currentTime);
   }, [currentTime, onTimeUpdate]);
+
+  // Monitor player status for ready state
+  useEffect(() => {
+    const checkPlayerReady = setInterval(() => {
+      try {
+        if (player && player.duration && player.duration > 0 && !isPlayerReady) {
+          setIsPlayerReady(true);
+          setDuration(player.duration * 1000);
+        }
+      } catch (err) {
+        console.error('Player ready check error:', err);
+      }
+    }, 500);
+
+    return () => clearInterval(checkPlayerReady);
+  }, [player, isPlayerReady]);
 
   // Controls visibility
   const showControls = () => {
@@ -147,7 +170,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
   // Format time
   const formatTime = (ms: number): string => {
     if (isNaN(ms) || !isFinite(ms)) return '00:00';
-    
+
     const totalSeconds = Math.floor(ms / 1000);
     const hours = Math.floor(totalSeconds / 3600);
     const minutes = Math.floor((totalSeconds % 3600) / 60);
@@ -159,40 +182,32 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
     return `${minutes}:${seconds.toString().padStart(2, '0')}`;
   };
 
-  // Seek
+  // Seek to time
   const seekToTime = (timeInSeconds: number) => {
     try {
       if (!isNaN(timeInSeconds) && isFinite(timeInSeconds)) {
-        player.currentTime = Math.max(0, Math.min(timeInSeconds, duration / 1000));
-        setCurrentTime(Math.max(0, Math.min(timeInSeconds * 1000, duration)));
+        const clampedTime = Math.max(0, Math.min(timeInSeconds, duration / 1000));
+        player.currentTime = clampedTime;
+        setCurrentTime(clampedTime * 1000);
       }
     } catch (err) {
       console.error('Seek error:', err);
     }
   };
 
-  // Progress bar
+  // Progress bar press
   const handleProgressPress = (event: GestureResponderEvent) => {
     try {
       const { locationX } = event.nativeEvent;
-      const progressWidth = width - 30;
+      const progressWidth = screenWidth - 30;
       const percentage = Math.max(0, Math.min(1, locationX / progressWidth));
       const newTimeInSeconds = (percentage * duration) / 1000;
-      
+
       seekToTime(newTimeInSeconds);
       showControls();
     } catch (err) {
       console.error('Progress press error:', err);
     }
-  };
-
-  const handleSeekStart = () => {
-    setIsSeeking(true);
-  };
-
-  const handleSeekEnd = () => {
-    setIsSeeking(false);
-    showControls();
   };
 
   // Skip buttons
@@ -208,7 +223,12 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
     showControls();
   };
 
-  // Fullscreen
+  // Adjust subtitle offset
+  const adjustSubtitleOffset = (direction: number) => {
+    setSubtitleOffset(subtitleOffset + direction * 0.5);
+  };
+
+  // Fullscreen toggle
   const toggleFullscreen = async () => {
     try {
       if (isFullscreen) {
@@ -224,10 +244,28 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
     showControls();
   };
 
+  // Handle text selection from subtitle
+  const handleTextSelect = (text: string) => {
+    setSelectedText(text);
+    if (onTextSelect) {
+      onTextSelect(text);
+    }
+  };
 
+  const handleClearSelection = () => {
+    setSelectedText('');
+  };
 
   return (
     <View style={styles.container}>
+      {/* Back Button */}
+      {onBack && !isFullscreen && (
+        <TouchableOpacity style={styles.backButton} onPress={onBack}>
+          <Ionicons name="arrow-back" size={24} color="#fff" />
+          <Text style={styles.backText}>Back</Text>
+        </TouchableOpacity>
+      )}
+
       {/* Video Container */}
       <View style={styles.videoContainer}>
         <VideoView
@@ -236,11 +274,11 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
           nativeControls={false}
         />
 
-        {/* Loading Indicator - Only show if NOT ready AND NOT playing */}
-        {!isPlayerReady && !isPlaying && (
+        {/* Loading Indicator */}
+        {!isPlayerReady && (
           <View style={styles.centerOverlay}>
             <ActivityIndicator size="large" color="#FFB6D9" />
-            <Text style={styles.loadingText}>Loading...</Text>
+            <Text style={styles.loadingText}>Loading video...</Text>
           </View>
         )}
 
@@ -260,7 +298,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
         />
 
         {/* Subtitle Display */}
-        {currentSubtitle && (
+        {showSubtitles && currentSubtitle && (
           <View style={styles.subtitleContainer}>
             <Text style={styles.subtitleText}>{currentSubtitle.text}</Text>
           </View>
@@ -297,16 +335,15 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
               <TouchableOpacity
                 style={styles.progressContainer}
                 onPress={handleProgressPress}
-                onPressIn={handleSeekStart}
-                onPressOut={handleSeekEnd}
-                activeOpacity={0.8}
+                onPressIn={() => setIsSeeking(true)}
+                onPressOut={() => setIsSeeking(false)}
               >
                 <View style={styles.progressTrack}>
                   <View
                     style={[
                       styles.progressFill,
                       {
-                        width: duration > 0 ? `${(currentTime / duration) * 100}%` : '0%',
+                        width: `${(currentTime / duration) * 100}%`,
                       },
                     ]}
                   />
@@ -351,6 +388,14 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
                 {/* Spacer */}
                 <View style={{ flex: 1 }} />
 
+                {/* Subtitle Toggle */}
+                <TouchableOpacity
+                  onPress={() => setShowSubtitles(!showSubtitles)}
+                  style={styles.iconButton}
+                >
+                  <Text style={styles.ccText}>CC</Text>
+                </TouchableOpacity>
+
                 {/* Fullscreen Button */}
                 <TouchableOpacity
                   onPress={toggleFullscreen}
@@ -363,6 +408,25 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
                   />
                 </TouchableOpacity>
               </View>
+
+              {/* Subtitle Offset Buttons */}
+              {subtitles.length > 0 && (
+                <View style={styles.offsetButtonsContainer}>
+                  <TouchableOpacity
+                    onPress={() => adjustSubtitleOffset(-1)}
+                    style={styles.offsetButton}
+                  >
+                    <Text style={styles.offsetButtonText}>-0.5s</Text>
+                  </TouchableOpacity>
+                  <Text style={styles.offsetText}>Offset: {subtitleOffset.toFixed(1)}s</Text>
+                  <TouchableOpacity
+                    onPress={() => adjustSubtitleOffset(1)}
+                    style={styles.offsetButton}
+                  >
+                    <Text style={styles.offsetButtonText}>+0.5s</Text>
+                  </TouchableOpacity>
+                </View>
+              )}
             </View>
           </View>
         )}
@@ -412,6 +476,24 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#000',
   },
+  backButton: {
+    position: 'absolute',
+    top: 16,
+    left: 16,
+    zIndex: 50,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 8,
+    gap: 8,
+  },
+  backText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '600',
+  },
   videoContainer: {
     flex: 1,
     backgroundColor: '#000',
@@ -446,7 +528,7 @@ const styles = StyleSheet.create({
   },
   subtitleContainer: {
     position: 'absolute',
-    bottom: 90,
+    bottom: 110,
     left: 0,
     right: 0,
     paddingHorizontal: 16,
@@ -464,7 +546,6 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
     borderRadius: 6,
   },
-  // Controls Wrapper
   controlsWrapper: {
     ...StyleSheet.absoluteFillObject,
     backgroundColor: 'rgba(0, 0, 0, 0.3)',
@@ -500,12 +581,10 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     paddingBottom: 12,
   },
-  // Progress Bar
   progressContainer: {
     marginBottom: 12,
     height: 28,
     justifyContent: 'center',
-    paddingHorizontal: 0,
   },
   progressTrack: {
     height: 4,
@@ -518,7 +597,6 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFB6D9',
     borderRadius: 2,
   },
-  // Control Buttons Row
   controlsRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -544,11 +622,41 @@ const styles = StyleSheet.create({
     marginLeft: 4,
     fontVariant: ['tabular-nums'],
   },
+  ccText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: '700',
+  },
   iconButton: {
     paddingHorizontal: 8,
     paddingVertical: 4,
   },
-  // Modal
+  offsetButtonsContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    marginTop: 8,
+    paddingTop: 8,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255, 255, 255, 0.1)',
+  },
+  offsetButton: {
+    backgroundColor: 'rgba(255, 182, 217, 0.2)',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 4,
+  },
+  offsetButtonText: {
+    color: '#FFB6D9',
+    fontSize: 11,
+    fontWeight: '600',
+  },
+  offsetText: {
+    color: '#fff',
+    fontSize: 11,
+    fontWeight: '600',
+  },
   modalContainer: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.6)',
@@ -601,7 +709,7 @@ const styles = StyleSheet.create({
   exampleSection: {
     marginTop: 16,
   },
-  sectionTitle: {
+  sectionSection: {
     fontSize: 14,
     fontWeight: '600',
     color: '#333',

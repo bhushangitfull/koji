@@ -5,23 +5,56 @@ import { StatusBar } from 'expo-status-bar';
 import 'react-native-reanimated';
 
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { AuthProvider } from '@/utils/auth-context.tsx';
+import { useAuth } from '@/hooks/useAuth';
+import { AuthLoadingScreen } from '@/components/AuthLoadingScreen';
 
 export const unstable_settings = {
   anchor: '(tabs)',
 };
+
+function RootLayoutNav() {
+  const colorScheme = useColorScheme();
+  const { isLoading, isSignedIn } = useAuth();
+
+  if (isLoading) {
+    return <AuthLoadingScreen />;
+  }
+
+  return (
+    <Stack>
+      {isSignedIn ? (
+        // Authenticated stack
+        <>
+          <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+          <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />
+        </>
+      ) : (
+        // Auth stack
+        <Stack.Screen
+          name="(auth)"
+          options={{
+            headerShown: false,
+            animationEnabled: false,
+          }}
+        />
+      )}
+    </Stack>
+  );
+}
 
 export default function RootLayout() {
   const colorScheme = useColorScheme();
 
   return (
     <SafeAreaProvider>
-      <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-        <Stack>
-          <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-          <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />
-        </Stack>
-        <StatusBar style="auto" />
-      </ThemeProvider>
+      <AuthProvider>
+        <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
+          <RootLayoutNav />
+          <StatusBar style="auto" />
+        </ThemeProvider>
+      </AuthProvider>
     </SafeAreaProvider>
   );
 }
+
