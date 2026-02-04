@@ -1,33 +1,11 @@
 /**
- * Authentication Context & Provider
- * Manages global authentication state
+ * Authentication Context & Provider - Supabase Version
  */
 
+import { AuthContextType, SignInPayload, SignUpPayload, User } from '@/types/auth';
+import { Session } from '@supabase/supabase-js';
 import React, { createContext, useCallback, useEffect, useState } from 'react';
-import {
-  AuthContextType,
-  User,
-  SignUpPayload,
-  SignInPayload,
-  ForgotPasswordPayload,
-  ResetPasswordPayload,
-} from '@/types/auth';
-import {
-  saveToken,
-  saveRefreshToken,
-  getToken,
-  getUser,
-  saveUser,
-  clearAuthData,
-} from './token-storage';
-import {
-  authSignUp,
-  authSignIn,
-  authForgotPassword,
-  authResetPassword,
-  authVerifyToken,
-} from './api-client';
-import { parseAuthError } from './validation';
+import { supabase } from './supabase';
 
 export const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
@@ -44,62 +22,76 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     setError(null);
   }, []);
 
-  // Restore token on app launch
-  const restoreToken = useCallback(async () => {
-    try {
-      setIsLoading(true);
-      const token = await getToken();
+  // Convert Supabase user to our User type
+  const mapSupabaseUser = (session: Session | null): User | null => {
+    if (!session?.user) return null;
 
-      if (token) {
-        // Try to verify token is still valid
-        try {
-          const response = await authVerifyToken();
-          if (response.success && response.user) {
-            setUser(response.user);
-          } else {
-            // Token invalid, clear it
-            await clearAuthData();
-            setUser(null);
-          }
-        } catch (err) {
-          // Token verification failed, clear auth data
-          await clearAuthData();
-          setUser(null);
-        }
-      }
-    } catch (err) {
-      console.error('Token restoration failed:', err);
-    } finally {
-      setIsLoading(false);
-    }
-  }, []);
+    return {
+      id: session.user.id,
+      email: session.user.email || '',
+      name: session.user.user_metadata?.name || '',
+      jlptLevel: session.user.user_metadata?.jlpt_level || 'N5',
+      avatarUrl: session.user.user_metadata?.avatar_url || null,
+      createdAt: session.user.created_at || new Date().toISOString(),
+    };
+  };
 
-  // Initialize auth on mount
+  // Initialize auth session
   useEffect(() => {
-    restoreToken();
-  }, [restoreToken]);
+    // Get initial session
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setUser(mapSupabaseUser(session));
+      setIsLoading(false);
+    });
+
+    // Listen for auth changes
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(mapSupabaseUser(session));
+      setIsLoading(false);
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
 
   const signUp = useCallback(async (payload: SignUpPayload) => {
     try {
       setError(null);
       setIsLoading(true);
 
-      const response = await authSignUp(payload);
+      const { data, error: signUpError } = await supabase.auth.signUp({
+        email: payload.email,
+        password: payload.password,
+        options: {
+          data: {
+            name: payload.name,
+            jlpt_level: payload.jlptLevel || 'N5',
+          },
+        },
+      });
 
-      if (!response.success) {
-        throw new Error(response.error || 'Sign up failed');
-      }
+      if (signUpError) throw signUpError;
 
-      if (response.token && response.user) {
-        await saveToken(response.token);
-        if (response.refreshToken) {
-          await saveRefreshToken(response.refreshToken);
+      // Insert user data into users table
+      if (data.user) {
+        const { error: insertError } = await supabase.from('users').insert({
+          id: data.user.id,
+          email: payload.email,
+          name: payload.name,
+          jlpt_level: payload.jlptLevel || 'N5',
+          password_hash: '', // Not needed with Supabase auth
+        });
+
+        if (insertError && insertError.code !== '23505') {
+          // Ignore duplicate key error
+          console.error('Error inserting user:', insertError);
         }
-        await saveUser(response.user);
-        setUser(response.user);
       }
+
+      setUser(mapSupabaseUser(data.session));
     } catch (err: any) {
-      const errorMessage = parseAuthError(err);
+      const errorMessage = err.message || 'Sign up failed';
       setError(errorMessage);
       throw new Error(errorMessage);
     } finally {
@@ -112,22 +104,16 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       setError(null);
       setIsLoading(true);
 
-      const response = await authSignIn(payload);
+      const { data, error: signInError } = await supabase.auth.signInWithPassword({
+        email: payload.email,
+        password: payload.password,
+      });
 
-      if (!response.success) {
-        throw new Error(response.error || 'Sign in failed');
-      }
+      if (signInError) throw signInError;
 
-      if (response.token && response.user) {
-        await saveToken(response.token);
-        if (response.refreshToken) {
-          await saveRefreshToken(response.refreshToken);
-        }
-        await saveUser(response.user);
-        setUser(response.user);
-      }
+      setUser(mapSupabaseUser(data.session));
     } catch (err: any) {
-      const errorMessage = parseAuthError(err);
+      const errorMessage = err.message || 'Sign in failed';
       setError(errorMessage);
       throw new Error(errorMessage);
     } finally {
@@ -138,43 +124,46 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const signOut = useCallback(async () => {
     try {
       setError(null);
-      await clearAuthData();
+      const { error: signOutError } = await supabase.auth.signOut();
+      if (signOutError) throw signOutError;
       setUser(null);
     } catch (err: any) {
-      const errorMessage = parseAuthError(err);
+      const errorMessage = err.message || 'Sign out failed';
       setError(errorMessage);
       throw new Error(errorMessage);
     }
   }, []);
 
-  const forgotPassword = useCallback(async (payload: ForgotPasswordPayload) => {
+  const forgotPassword = useCallback(async ({ email }: { email: string }) => {
     try {
       setError(null);
-      const response = await authForgotPassword(payload.email);
-
-      if (!response.success) {
-        throw new Error(response.error || 'Failed to send reset email');
-      }
+      const { error: resetError } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: 'koji://reset-password',
+      });
+      if (resetError) throw resetError;
     } catch (err: any) {
-      const errorMessage = parseAuthError(err);
+      const errorMessage = err.message || 'Failed to send reset email';
       setError(errorMessage);
       throw new Error(errorMessage);
     }
   }, []);
 
-  const resetPassword = useCallback(async (payload: ResetPasswordPayload) => {
+  const resetPassword = useCallback(async ({ token, newPassword }: { token: string; newPassword: string }) => {
     try {
       setError(null);
-      const response = await authResetPassword(payload.token, payload.newPassword);
-
-      if (!response.success) {
-        throw new Error(response.error || 'Failed to reset password');
-      }
+      const { error: updateError } = await supabase.auth.updateUser({
+        password: newPassword,
+      });
+      if (updateError) throw updateError;
     } catch (err: any) {
-      const errorMessage = parseAuthError(err);
+      const errorMessage = err.message || 'Failed to reset password';
       setError(errorMessage);
       throw new Error(errorMessage);
     }
+  }, []);
+
+  const restoreToken = useCallback(async () => {
+    // Not needed - Supabase handles this automatically
   }, []);
 
   const isSignedIn = !!user;
@@ -193,9 +182,5 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     clearError,
   };
 
-  return (
-    <AuthContext.Provider value={value}>
-      {children}
-    </AuthContext.Provider>
-  );
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };

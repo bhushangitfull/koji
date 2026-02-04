@@ -1,9 +1,9 @@
-import { View, ScrollView, StyleSheet, Text } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { useColorScheme } from '@/hooks/use-color-scheme';
+import { ThemedText } from '@/components/themed-text';
 import { RetroWindow } from '@/components/ui/retro-window';
 import { Colors, Fonts } from '@/constants/theme';
-import { ThemedText } from '@/components/themed-text';
+import { useColorScheme } from '@/hooks/use-color-scheme';
+import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 // Mock user data
 const mockUserStats = {
@@ -218,13 +218,11 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     fontFamily: Fonts.mono,
     marginBottom: 8,
-    fontFamily: Fonts.mono,
   },
   subtitle: {
     fontSize: 15,
     opacity: 0.6,
     fontWeight: '500',
-    fontFamily: Fonts.mono,
     fontFamily: Fonts.mono,
   },
 
