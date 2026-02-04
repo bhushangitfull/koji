@@ -73,21 +73,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
       if (signUpError) throw signUpError;
 
-      // Insert user data into users table
-      if (data.user) {
-        const { error: insertError } = await supabase.from('users').insert({
-          id: data.user.id,
-          email: payload.email,
-          name: payload.name,
-          jlpt_level: payload.jlptLevel || 'N5',
-          password_hash: '', // Not needed with Supabase auth
-        });
-
-        if (insertError && insertError.code !== '23505') {
-          // Ignore duplicate key error
-          console.error('Error inserting user:', insertError);
-        }
-      }
+      // ✅ No manual insert needed - the database trigger handles it!
+      // The handle_new_user() trigger automatically creates records in:
+      // - public.users
+      // - public.user_stats
 
       setUser(mapSupabaseUser(data.session));
     } catch (err: any) {
