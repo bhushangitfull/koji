@@ -24,23 +24,30 @@ function RootLayoutNav() {
   const router = useRouter();
 
   // Handle navigation based on auth and profile status
-  useEffect(() => {
-    if (authLoading || profileLoading) return;
+ useEffect(() => {
+  // 1. If Auth is still initializing the VERY first time, wait.
+  if (authLoading) return;
 
-    const inAuthGroup = segments[0] === '(auth)';
-    const inSetup = segments[0] === 'user-setup';
+  const inAuthGroup = segments[0] === '(auth)';
+  const inSetup = segments[0] === 'user-setup';
 
-    if (!isSignedIn && !inAuthGroup) {
-      // Redirect to sign in if not authenticated
+  // 2. PRIORITY: Handle Signed Out State
+  if (!isSignedIn) {
+    if (!inAuthGroup) {
       router.replace('/(auth)/sign-in');
-    } else if (isSignedIn && profile && !profile.profile_completed && !inSetup) {
-      // Redirect to setup if profile not complete
-      router.replace('/user-setup');
-    } else if (isSignedIn && profile?.profile_completed && inSetup) {
-      // Redirect to tabs if setup is already complete
-      router.replace('/(tabs)');
     }
-  }, [isSignedIn, profile, authLoading, profileLoading, segments]);
+    return; // EXIT EARLY. Do not check profileLoading.
+  }
+
+  // 3. Handle Signed In State (Now we care about profile)
+  if (profileLoading) return; 
+
+  if (profile && !profile.profile_completed && !inSetup) {
+    router.replace('/user-setup');
+  } else if (profile?.profile_completed && (inSetup || inAuthGroup)) {
+    router.replace('/(tabs)');
+  }
+}, [isSignedIn, profile, authLoading, profileLoading, segments]);
 
   if (authLoading || (isSignedIn && profileLoading)) {
     return <AuthLoadingScreen />;

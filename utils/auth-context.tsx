@@ -3,6 +3,7 @@
  */
 
 import { AuthContextType, SignInPayload, SignUpPayload, User } from '@/types/auth';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Session } from '@supabase/supabase-js';
 import React, { createContext, useCallback, useEffect, useState } from 'react';
 import { supabase } from './supabase';
@@ -112,14 +113,20 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   const signOut = useCallback(async () => {
     try {
-      setError(null);
-      const { error: signOutError } = await supabase.auth.signOut();
-      if (signOutError) throw signOutError;
+      // 1. Tell Supabase to sign out locally
+      await supabase.auth.signOut({ scope: 'local' });
+
+      // 2. MANUALLY wipe the storage key (Supabase uses 'supabase.auth.token' or similar)
+      // To be safe, we clear all or target the specific key
+      await AsyncStorage.clear();
+
+      // 3. Reset React State
       setUser(null);
+      setError(null);
     } catch (err: any) {
-      const errorMessage = err.message || 'Sign out failed';
-      setError(errorMessage);
-      throw new Error(errorMessage);
+      // Force reset anyway
+      setUser(null);
+      await AsyncStorage.clear();
     }
   }, []);
 

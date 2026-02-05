@@ -34,7 +34,7 @@ export const useUserProfile = () => {
   const fetchProfile = async () => {
     if (!user?.id) {
       setProfile(null);
-      setLoading(false);
+      setLoading(false); // Make sure this is false!
       return;
     }
 

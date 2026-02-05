@@ -62,7 +62,7 @@ export default function ProfileScreen() {
         onPress: async () => {
           try {
             await signOut();
-            router.replace('/(auth)/sign-in');
+            // No router.replace needed here! The Root Layout handles it.
           } catch (error: any) {
             Alert.alert('Error', error.message);
           }
@@ -251,7 +251,7 @@ export default function ProfileScreen() {
               {profile.total_words_learned}
             </Text>
           </View>
-          
+
           <View style={[styles.progressRow, styles.infoRowBorder]}>
             <View style={styles.progressLabel}>
               <MaterialCommunityIcons name="format-quote-close" size={20} color={colors.primary} />
@@ -273,7 +273,7 @@ export default function ProfileScreen() {
           </View>
         </RetroWindow>
 
-    
+
 
         {/* Logout Button */}
         <TouchableOpacity
