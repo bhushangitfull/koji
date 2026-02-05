@@ -273,17 +273,7 @@ export default function ProfileScreen() {
           </View>
         </RetroWindow>
 
-        {/* Action Buttons */}
-        <View style={styles.actionButtons}>
-          <RetroButton
-            variant="outline"
-            size="medium"
-            onPress={handleEditProfile}
-            style={styles.actionButton}
-          >
-            Edit Profile
-          </RetroButton>
-        </View>
+    
 
         {/* Logout Button */}
         <TouchableOpacity

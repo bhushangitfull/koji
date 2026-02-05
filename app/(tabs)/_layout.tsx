@@ -4,7 +4,7 @@ import React from 'react';
 import { HapticTab } from '@/components/haptic-tab';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { RetroTabBar } from '@/components/ui/retro-tab-bar';
-import { Colors, Fonts } from '@/constants/theme';
+import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 
 export default function TabLayout() {
@@ -17,18 +17,6 @@ export default function TabLayout() {
         tabBarActiveTintColor: colors.tabIconSelected,
         headerShown: false,
         tabBarButton: HapticTab,
-        headerStyle: {
-          backgroundColor: colors.retroBg,
-          borderBottomWidth: 3,
-          borderBottomColor: '#000000',
-        },
-        headerTintColor: '#FFFFFF',
-        headerTitleStyle: {
-          fontWeight: 'bold',
-          fontSize: 18,
-          letterSpacing: 0.5,
-          fontFamily: Fonts.rounded,
-        },
       }}
       tabBar={(props) => <RetroTabBar {...props} />}
     >

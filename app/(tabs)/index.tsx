@@ -49,7 +49,7 @@ export default function HomeScreen() {
       </RetroWindow>
 
       {/* Study Streak */}
-      <RetroWindow
+      {/* <RetroWindow
         title="Current Streak"
         color="purple"
         style={styles.windowSection}
@@ -59,10 +59,10 @@ export default function HomeScreen() {
           <Text style={[styles.streakLabel, { color: '#333333' }]}>Days</Text>
           <Text style={[styles.streakSubtext, { color: '#666666' }]}>Keep it going!</Text>
         </View>
-      </RetroWindow>
+      </RetroWindow> */}
 
       {/* Daily Goal */}
-      <RetroWindow
+      {/* <RetroWindow
         title="Daily Goal"
         color="pink"
         style={styles.windowSection}
@@ -75,7 +75,7 @@ export default function HomeScreen() {
             60% complete - 30 more minutes to go!
           </Text>
         </View>
-      </RetroWindow>
+      </RetroWindow> */}
 
       {/* Quick Actions */}
       <RetroWindow
@@ -192,7 +192,7 @@ export default function HomeScreen() {
       </RetroWindow>
 
       {/* Study Schedule */}
-      <RetroWindow
+      {/* <RetroWindow
         title="Study Schedule"
         color="pink"
         style={[styles.windowSection, { marginBottom: 40 }]}
@@ -211,7 +211,7 @@ export default function HomeScreen() {
             <Text style={[styles.scheduleTime, { color: colors.primary }]}>2:30 PM</Text>
           </View>
         </View>
-      </RetroWindow>
+      </RetroWindow> */}
     </ScrollView>
     </SafeAreaView>
   );

@@ -47,7 +47,9 @@ function RootLayoutNav() {
   }
 
   return (
-    <Stack>
+    <Stack  screenOptions={{
+    headerShown: false, // ← This is crucial!
+  }}>
       {!isSignedIn ? (
         // Auth stack
         <Stack.Screen
@@ -70,7 +72,7 @@ function RootLayoutNav() {
         // Authenticated stack
         <>
           <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-          <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />
+          <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal', headerShown: false }} />
           <Stack.Screen name="player" options={{ headerShown: false, presentation: 'fullScreenModal' }} />
           <Stack.Screen 
             name="user-setup" 
