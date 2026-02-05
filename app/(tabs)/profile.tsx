@@ -3,36 +3,23 @@ import { RetroWindow } from '@/components/ui/retro-window';
 import { Colors, Fonts } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useAuth } from '@/hooks/useAuth';
+import { useUserProfile } from '@/hooks/useUserProfile';
 import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import { Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-// This would come from Supabase in production
-const profileData = {
-  playerName: 'KojiLearner',
-  email: 'user@example.com',
-  level: 'Intermediate',
-  bio: 'Learning Japanese through anime! Currently watching Attack on Titan and Demon Slayer. Goal: Pass JLPT N3 this year!',
-  totalPoints: 4250,
-  joinedDate: 'Jan 15, 2024',
-  streak: 12,
-  totalEpisodes: 28,
-  achievements: [
-    { id: 1, title: '7-Day Streak', description: 'Study 7 days in a row', unlocked: true },
-    { id: 2, title: 'Word Master', description: 'Learn 500 words', unlocked: true },
-    { id: 3, title: 'Episode Binge', description: 'Watch 10 episodes', unlocked: false },
-    { id: 4, title: 'Quiz Champion', description: 'Score 100% on 5 quizzes', unlocked: false },
-  ],
-};
-
 const getLevelIcon = (level: string) => {
-  switch (level.toLowerCase()) {
-    case 'beginner':
+  switch (level) {
+    case 'N5':
       return 'seedling';
-    case 'intermediate':
+    case 'N4':
+      return 'sprout';
+    case 'N3':
       return 'run-fast';
-    case 'advanced':
+    case 'N2':
+      return 'star-outline';
+    case 'N1':
       return 'star';
     default:
       return 'help-circle';
@@ -40,13 +27,17 @@ const getLevelIcon = (level: string) => {
 };
 
 const getLevelColor = (level: string) => {
-  switch (level.toLowerCase()) {
-    case 'beginner':
+  switch (level) {
+    case 'N5':
       return '#A8E6CF';
-    case 'intermediate':
+    case 'N4':
+      return '#7FE5DE';
+    case 'N3':
       return '#FFB6D9';
-    case 'advanced':
+    case 'N2':
       return '#FFD700';
+    case 'N1':
+      return '#9B59B6';
     default:
       return '#CCCCCC';
   }
@@ -55,7 +46,8 @@ const getLevelColor = (level: string) => {
 export default function ProfileScreen() {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
-  const { signOut } = useAuth();
+  const { signOut, user } = useAuth();
+  const { profile, loading } = useUserProfile();
   const router = useRouter();
 
   const handleLogout = async () => {
@@ -80,9 +72,33 @@ export default function ProfileScreen() {
   };
 
   const handleEditProfile = () => {
-    // Navigate to user setup screen for editing
     router.push('/user-setup');
   };
+
+  if (loading) {
+    return (
+      <SafeAreaView style={[styles.container, { backgroundColor: colors.retroBg }]}>
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={colors.primary} />
+          <Text style={[styles.loadingText, { color: colors.text }]}>Loading profile...</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  if (!profile) {
+    return (
+      <SafeAreaView style={[styles.container, { backgroundColor: colors.retroBg }]}>
+        <View style={styles.errorContainer}>
+          <Feather name="alert-circle" size={48} color={colors.primary} />
+          <Text style={[styles.errorText, { color: colors.text }]}>Failed to load profile</Text>
+          <RetroButton variant="primary" onPress={() => router.replace('/user-setup')}>
+            Complete Setup
+          </RetroButton>
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.retroBg }]}>
@@ -90,7 +106,7 @@ export default function ProfileScreen() {
         {/* Header */}
         <View style={styles.header}>
           <Text style={[styles.title, { color: '#000000' }]}>Profile</Text>
-          <Text style={[styles.subtitle, { color: '#333333' }]}>Your learning profile</Text>
+          <Text style={[styles.subtitle, { color: '#333333' }]}>Your learning journey</Text>
         </View>
 
         {/* Player Card */}
@@ -109,13 +125,13 @@ export default function ProfileScreen() {
                 style={[
                   styles.levelBadge,
                   {
-                    backgroundColor: getLevelColor(profileData.level),
+                    backgroundColor: getLevelColor(profile.jlpt_level),
                     borderColor: '#000',
                   },
                 ]}
               >
                 <MaterialCommunityIcons
-                  name={getLevelIcon(profileData.level)}
+                  name={getLevelIcon(profile.jlpt_level)}
                   size={16}
                   color="#000"
                 />
@@ -123,14 +139,14 @@ export default function ProfileScreen() {
             </View>
             <View style={styles.playerInfo}>
               <Text style={[styles.playerName, { color: '#333333' }]}>
-                {profileData.playerName}
+                {profile.display_name}
               </Text>
               <View style={styles.levelContainer}>
                 <Text style={[styles.levelText, { color: '#666666' }]}>
-                  {profileData.level} Level
+                  {profile.jlpt_level}
                 </Text>
               </View>
-              <Text style={[styles.emailText, { color: '#999999' }]}>{profileData.email}</Text>
+              <Text style={[styles.emailText, { color: '#999999' }]}>{user?.email}</Text>
             </View>
             <TouchableOpacity onPress={handleEditProfile} style={styles.editButton}>
               <Feather name="edit-2" size={20} color={colors.primary} />
@@ -138,13 +154,13 @@ export default function ProfileScreen() {
           </View>
 
           {/* Bio Section */}
-          {profileData.bio && (
+          {profile.bio && (
             <View style={styles.bioSection}>
               <View style={styles.bioHeader}>
                 <MaterialCommunityIcons name="text" size={18} color="#666666" />
                 <Text style={[styles.bioLabel, { color: '#666666' }]}>Bio</Text>
               </View>
-              <Text style={[styles.bioText, { color: '#333333' }]}>{profileData.bio}</Text>
+              <Text style={[styles.bioText, { color: '#333333' }]}>{profile.bio}</Text>
             </View>
           )}
         </RetroWindow>
@@ -155,7 +171,7 @@ export default function ProfileScreen() {
             <View style={styles.statContent}>
               <MaterialCommunityIcons name="fire" size={28} color={colors.primary} />
               <Text style={[styles.statValue, { color: colors.primary }]}>
-                {profileData.streak}
+                {profile.current_streak}
               </Text>
               <Text style={[styles.statLabel, { color: '#333333' }]}>Day Streak</Text>
             </View>
@@ -163,11 +179,11 @@ export default function ProfileScreen() {
 
           <RetroWindow color="purple" style={styles.statCard}>
             <View style={styles.statContent}>
-              <MaterialCommunityIcons name="star" size={28} color={colors.primary} />
+              <MaterialCommunityIcons name="book-open-variant" size={28} color={colors.primary} />
               <Text style={[styles.statValue, { color: colors.primary }]}>
-                {profileData.totalPoints}
+                {profile.total_words_learned}
               </Text>
-              <Text style={[styles.statLabel, { color: '#333333' }]}>Points</Text>
+              <Text style={[styles.statLabel, { color: '#333333' }]}>Words</Text>
             </View>
           </RetroWindow>
 
@@ -175,7 +191,7 @@ export default function ProfileScreen() {
             <View style={styles.statContent}>
               <MaterialCommunityIcons name="television-play" size={28} color={colors.primary} />
               <Text style={[styles.statValue, { color: colors.primary }]}>
-                {profileData.totalEpisodes}
+                {profile.total_episodes_watched}
               </Text>
               <Text style={[styles.statLabel, { color: '#333333' }]}>Episodes</Text>
             </View>
@@ -189,70 +205,73 @@ export default function ProfileScreen() {
               <Feather name="calendar" size={16} color="#666666" />
               <Text style={[styles.infoLabel, { color: '#666666' }]}>Member Since</Text>
             </View>
-            <Text style={[styles.infoValue, { color: '#333333' }]}>{profileData.joinedDate}</Text>
+            <Text style={[styles.infoValue, { color: '#333333' }]}>
+              {new Date(profile.created_at).toLocaleDateString()}
+            </Text>
           </View>
           <View style={[styles.infoRow, styles.infoRowBorder]}>
             <View style={styles.infoRowLeft}>
               <MaterialCommunityIcons
-                name={getLevelIcon(profileData.level)}
+                name={getLevelIcon(profile.jlpt_level)}
                 size={16}
                 color="#666666"
               />
-              <Text style={[styles.infoLabel, { color: '#666666' }]}>Current Level</Text>
+              <Text style={[styles.infoLabel, { color: '#666666' }]}>JLPT Level</Text>
             </View>
-            <Text style={[styles.infoValue, { color: '#333333' }]}>{profileData.level}</Text>
+            <Text style={[styles.infoValue, { color: '#333333' }]}>{profile.jlpt_level}</Text>
           </View>
           <View style={[styles.infoRow, styles.infoRowBorder]}>
             <View style={styles.infoRowLeft}>
-              <Feather name="mail" size={16} color="#666666" />
-              <Text style={[styles.infoLabel, { color: '#666666' }]}>Email</Text>
+              <Feather name="clock" size={16} color="#666666" />
+              <Text style={[styles.infoLabel, { color: '#666666' }]}>Study Time</Text>
             </View>
-            <Text style={[styles.infoValue, { color: '#333333' }]} numberOfLines={1}>
-              {profileData.email}
+            <Text style={[styles.infoValue, { color: '#333333' }]}>
+              {Math.floor(profile.total_study_minutes / 60)}h {profile.total_study_minutes % 60}m
+            </Text>
+          </View>
+          <View style={[styles.infoRow, styles.infoRowBorder]}>
+            <View style={styles.infoRowLeft}>
+              <MaterialCommunityIcons name="trophy" size={16} color="#666666" />
+              <Text style={[styles.infoLabel, { color: '#666666' }]}>Longest Streak</Text>
+            </View>
+            <Text style={[styles.infoValue, { color: '#333333' }]}>
+              {profile.longest_streak} days
             </Text>
           </View>
         </RetroWindow>
 
-        {/* Achievements */}
-        <View style={styles.achievementSection}>
-          <Text style={[styles.sectionTitle, { color: '#000000' }]}>Achievements</Text>
-          {profileData.achievements.map((achievement) => (
-            <RetroWindow key={achievement.id} style={styles.achievementCard}>
-              <View style={styles.achievementRow}>
-                <View
-                  style={[
-                    styles.achievementBadge,
-                    {
-                      backgroundColor: achievement.unlocked
-                        ? colors.primary + '20'
-                        : colors.textSecondary + '15',
-                      borderColor: achievement.unlocked ? colors.primary : colors.textSecondary,
-                    },
-                  ]}
-                >
-                  <Feather
-                    name={achievement.unlocked ? 'award' : 'lock'}
-                    size={20}
-                    color={achievement.unlocked ? colors.primary : colors.textSecondary}
-                  />
-                </View>
-                <View style={styles.achievementInfo}>
-                  <Text style={[styles.achievementTitle, { color: '#333333' }]}>
-                    {achievement.title}
-                  </Text>
-                  <Text style={[styles.achievementDesc, { color: '#666666' }]}>
-                    {achievement.description}
-                  </Text>
-                </View>
-                {achievement.unlocked && (
-                  <View style={styles.unlockedBadge}>
-                    <Text style={[styles.unlockedText, { color: colors.primary }]}>✓</Text>
-                  </View>
-                )}
-              </View>
-            </RetroWindow>
-          ))}
-        </View>
+        {/* Learning Stats */}
+        <RetroWindow title="Learning Progress" color="mint" style={styles.infoCard}>
+          <View style={styles.progressRow}>
+            <View style={styles.progressLabel}>
+              <MaterialCommunityIcons name="book" size={20} color={colors.primary} />
+              <Text style={[styles.progressText, { color: '#333333' }]}>Words Learned</Text>
+            </View>
+            <Text style={[styles.progressValue, { color: colors.primary }]}>
+              {profile.total_words_learned}
+            </Text>
+          </View>
+          
+          <View style={[styles.progressRow, styles.infoRowBorder]}>
+            <View style={styles.progressLabel}>
+              <MaterialCommunityIcons name="format-quote-close" size={20} color={colors.primary} />
+              <Text style={[styles.progressText, { color: '#333333' }]}>Phrases Learned</Text>
+            </View>
+            <Text style={[styles.progressValue, { color: colors.primary }]}>
+              {profile.total_phrases_learned}
+            </Text>
+          </View>
+
+          <View style={[styles.progressRow, styles.infoRowBorder]}>
+            <View style={styles.progressLabel}>
+              <MaterialCommunityIcons name="play-circle" size={20} color={colors.primary} />
+              <Text style={[styles.progressText, { color: '#333333' }]}>Episodes Watched</Text>
+            </View>
+            <Text style={[styles.progressValue, { color: colors.primary }]}>
+              {profile.total_episodes_watched}
+            </Text>
+          </View>
+        </RetroWindow>
 
         {/* Action Buttons */}
         <View style={styles.actionButtons}>
@@ -263,10 +282,6 @@ export default function ProfileScreen() {
             style={styles.actionButton}
           >
             Edit Profile
-          </RetroButton>
-
-          <RetroButton variant="outline" size="medium" onPress={() => {}} style={styles.actionButton}>
-            Settings
           </RetroButton>
         </View>
 
@@ -287,6 +302,28 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 16,
+  },
+  loadingText: {
+    fontSize: 16,
+    fontFamily: Fonts.mono,
+  },
+  errorContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 16,
+    padding: 20,
+  },
+  errorText: {
+    fontSize: 18,
+    fontFamily: Fonts.mono,
+    textAlign: 'center',
+  },
   scrollContent: {
     paddingHorizontal: 20,
     paddingTop: 20,
@@ -306,8 +343,6 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     fontFamily: Fonts.mono,
   },
-
-  // Player Card
   playerCard: {
     marginBottom: 24,
   },
@@ -366,8 +401,6 @@ const styles = StyleSheet.create({
   editButton: {
     padding: 8,
   },
-
-  // Bio Section
   bioSection: {
     paddingTop: 12,
     borderTopWidth: 1,
@@ -390,8 +423,6 @@ const styles = StyleSheet.create({
     lineHeight: 20,
     fontFamily: Fonts.mono,
   },
-
-  // Stats Grid
   statsGrid: {
     flexDirection: 'row',
     gap: 12,
@@ -416,8 +447,6 @@ const styles = StyleSheet.create({
     fontFamily: Fonts.mono,
     textAlign: 'center',
   },
-
-  // Info Card
   infoCard: {
     marginBottom: 24,
   },
@@ -449,70 +478,33 @@ const styles = StyleSheet.create({
     maxWidth: '50%',
     textAlign: 'right',
   },
-
-  // Achievements
-  achievementSection: {
-    marginBottom: 24,
+  progressRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 12,
   },
-  sectionTitle: {
-    fontSize: 16,
-    fontWeight: '700',
-    fontFamily: Fonts.mono,
-    marginBottom: 12,
-  },
-  achievementCard: {
-    marginBottom: 12,
-  },
-  achievementRow: {
+  progressLabel: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
+    gap: 8,
   },
-  achievementBadge: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    borderWidth: 2,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  achievementInfo: {
-    flex: 1,
-  },
-  achievementTitle: {
+  progressText: {
     fontSize: 14,
-    fontWeight: '700',
-    fontFamily: Fonts.mono,
-    marginBottom: 2,
-  },
-  achievementDesc: {
-    fontSize: 12,
-    fontWeight: '400',
+    fontWeight: '500',
     fontFamily: Fonts.mono,
   },
-  unlockedBadge: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  unlockedText: {
+  progressValue: {
     fontSize: 18,
     fontWeight: '700',
+    fontFamily: Fonts.mono,
   },
-
-  // Action Buttons
   actionButtons: {
-    flexDirection: 'row',
-    gap: 12,
     marginBottom: 16,
   },
   actionButton: {
-    flex: 1,
+    marginBottom: 12,
   },
-
-  // Logout Button
   logoutBtn: {
     flexDirection: 'row',
     alignItems: 'center',

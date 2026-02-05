@@ -62,15 +62,15 @@ export default function SignUpScreen() {
         jlptLevel: 'N5',
       });
 
-      // Navigate to home
-      router.replace('/(tabs)');
+      // Navigate to user setup (the layout will handle this automatically)
+      // router.replace('/user-setup');
     } catch (error: any) {
       const errorMessage = parseAuthError(error);
       Alert.alert('Sign Up Failed', errorMessage);
     } finally {
       setLoading(false);
     }
-  }, [name, email, password, confirmPassword, signUp, router]);
+  }, [name, email, password, confirmPassword, signUp]);
 
   if (!fontsLoaded) {
     return null;
