@@ -95,9 +95,9 @@ export const Fonts = Platform.select({
     mono: 'VT323',
   },
   web: {
-    sans: "'VT323', monospace",
-    serif: "'VT323', monospace",
-    rounded: "'VT323', monospace",
-    mono: "'VT323', monospace",
+    sans: "'SpaceMono', monospace",
+    serif: "'SpaceMono', monospace",
+    rounded: "'SpaceMono', monospace",
+    mono: "'SpaceMono', monospace",
   },
 });
