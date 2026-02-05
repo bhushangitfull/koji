@@ -1,7 +1,6 @@
 import { Tabs } from 'expo-router';
 import React from 'react';
 
-import { HapticTab } from '@/components/haptic-tab';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { RetroTabBar } from '@/components/ui/retro-tab-bar';
 import { Colors } from '@/constants/theme';
@@ -16,7 +15,6 @@ export default function TabLayout() {
       screenOptions={{
         tabBarActiveTintColor: colors.tabIconSelected,
         headerShown: false,
-        tabBarButton: HapticTab,
       }}
       tabBar={(props) => <RetroTabBar {...props} />}
     >
@@ -38,13 +36,6 @@ export default function TabLayout() {
         options={{
           title: 'Study',
           tabBarIcon: ({ color }) => <IconSymbol size={28} name="pencil.circle.fill" color={color} />,
-        }}
-      />
-      <Tabs.Screen
-        name="progress"
-        options={{
-          title: 'Progress',
-          tabBarIcon: ({ color }) => <IconSymbol size={28} name="chart.line.uptrend.xyaxis" color={color} />,
         }}
       />
       <Tabs.Screen

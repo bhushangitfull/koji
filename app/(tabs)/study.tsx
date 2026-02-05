@@ -1,11 +1,11 @@
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Modal, Dimensions, Animated } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { Feather, MaterialIcons } from '@expo/vector-icons';
-import { useState, useRef } from 'react';
 import { RetroButton } from '@/components/ui/retro-button';
 import { RetroWindow } from '@/components/ui/retro-window';
 import { Colors, Fonts } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { Feather, MaterialIcons } from '@expo/vector-icons';
+import { useState } from 'react';
+import { Modal, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 // Mock streak calendar data - 52 weeks * 7 days
 const generateStreakData = () => {
@@ -57,16 +57,6 @@ const STUDY_SESSIONS = [
     progress: 0,
     total: 10,
     icon: 'help-circle',
-  },
-  {
-    id: 3,
-    type: 'flashcard',
-    title: 'Kanji Flashcards',
-    description: 'Practice 20 kanji with stroke order',
-    duration: '15 mins',
-    progress: 0,
-    total: 20,
-    icon: 'grid',
   },
   {
     id: 4,

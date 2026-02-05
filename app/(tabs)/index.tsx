@@ -1,218 +1,228 @@
-import { RetroButton } from '@/components/ui/retro-button';
+import { ThemedText } from '@/components/themed-text';
 import { RetroWindow } from '@/components/ui/retro-window';
 import { Colors, Fonts } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-const MOTIVATIONAL_QUOTES = [
-  'Consistency is key! Try to study a little bit every day.',
-  'Every episode watched is progress made!',
-  'Small steps lead to big achievements!',
-  'Knowledge is the best investment.',
-  'You got this! Keep pushing forward!',
+// Mock user data
+const mockUserStats = {
+  streak: 12,
+  wordsLearned: 342,
+  phrasesLearned: 87,
+  minutesToday: 15,
+  totalMinutesThisMonth: 485,
+  totalEpisodesCompleted: 28,
+  currentLevel: 'Intermediate',
+  thisWeekEpisodes: 5,
+};
+
+// Mock weekly data for chart
+const weeklyData = [
+  { day: 'Mon', minutes: 25 },
+  { day: 'Tue', minutes: 30 },
+  { day: 'Wed', minutes: 0 },
+  { day: 'Thu', minutes: 45 },
+  { day: 'Fri', minutes: 20 },
+  { day: 'Sat', minutes: 35 },
+  { day: 'Sun', minutes: 15 },
 ];
 
-const RECENT_ACTIVITIES = [
-  { id: 1, title: 'Completed Episode 5', time: '2 hours ago', type: 'completed' },
-  { id: 2, title: 'Started Vocabulary Quiz', time: '5 hours ago', type: 'started' },
-  { id: 3, title: 'Finished Grammar Lesson', time: '1 day ago', type: 'completed' },
-];
-
-const ACHIEVEMENTS = [
-  { id: 1, name: 'First Step', icon: 'RS', unlocked: true },
-  { id: 2, name: '5-Day Streak', icon: 'ST', unlocked: false },
-  { id: 3, name: 'Speed Learner', icon: 'SL', unlocked: true },
-  { id: 4, name: 'Dedicated', icon: 'DD', unlocked: false },
+// Mock leaderboard data
+const leaderboardData = [
+  { rank: 1, name: 'Alex Chen', wordsLearned: 892, streak: 45, badge: '' },
+  { rank: 2, name: 'Jordan Smith', wordsLearned: 756, streak: 32, badge: '' },
+  { rank: 3, name: 'You', wordsLearned: 342, streak: 12, badge: '' },
+  { rank: 4, name: 'Taylor Brown', wordsLearned: 298, streak: 8, badge: '' },
+  { rank: 5, name: 'Morgan Lee', wordsLearned: 245, streak: 5, badge: '' },
 ];
 
 export default function HomeScreen() {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
-  const randomQuote = MOTIVATIONAL_QUOTES[Math.floor(Math.random() * MOTIVATIONAL_QUOTES.length)];
+  const isDark = colorScheme === 'dark';
+  const maxMinutes = Math.max(...weeklyData.map(d => d.minutes), 50);
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.retroBg }]}>
-      <ScrollView
-        contentContainerStyle={styles.content}
-      >
-      {/* Welcome Window */}
-      <RetroWindow
-        title="Welcome"
-        color="pink"
-        style={styles.windowSection}
-      >
-        <Text style={[styles.title, { color: '#000000' }]}>Koji Study Hub</Text>
-        <Text style={[styles.subtitle, { color: '#333333' }]}>
-          Your personal anime & language learning companion
-        </Text>
-      </RetroWindow>
-
-      {/* Study Streak */}
-      {/* <RetroWindow
-        title="Current Streak"
-        color="purple"
-        style={styles.windowSection}
-      >
-        <View style={styles.streakContainer}>
-          <Text style={[styles.streakNumber, { color: colors.primary }]}>12</Text>
-          <Text style={[styles.streakLabel, { color: '#333333' }]}>Days</Text>
-          <Text style={[styles.streakSubtext, { color: '#666666' }]}>Keep it going!</Text>
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
+        {/* Header */}
+        <View style={styles.header}>
+          <ThemedText type="title" style={[styles.title, { color: '#000000' }]}>Your Progress</ThemedText>
+          <ThemedText style={[styles.subtitle, { color: '#333333' }]}>Keep learning, keep growing</ThemedText>
         </View>
-      </RetroWindow> */}
 
-      {/* Daily Goal */}
-      {/* <RetroWindow
-        title="Daily Goal"
-        color="pink"
-        style={styles.windowSection}
-      >
-        <View style={styles.goalContainer}>
-          <View style={styles.progressBar}>
-            <View style={[styles.progressFill, { width: '60%', backgroundColor: colors.primary }]} />
-          </View>
-          <Text style={[styles.goalText, { color: '#333333' }]}>
-            60% complete - 30 more minutes to go!
-          </Text>
-        </View>
-      </RetroWindow> */}
-
-      {/* Quick Actions */}
-      <RetroWindow
-        title="Quick Actions"
-        color="purple"
-        style={styles.windowSection}
-      >
-        <View style={styles.buttonGrid}>
-          <RetroButton
-            variant="primary"
-            size="medium"
-            onPress={() => {}}
-            style={styles.actionButton}
-          >
-            Start Study
-          </RetroButton>
-          <RetroButton
-            variant="secondary"
-            size="medium"
-            onPress={() => {}}
-            style={styles.actionButton}
-          >
-            View Library
-          </RetroButton>
-        </View>
-        <View style={styles.buttonGrid}>
-          <RetroButton
-            variant="outline"
-            size="medium"
-            onPress={() => {}}
-            style={styles.actionButton}
-          >
-            Check Progress
-          </RetroButton>
-          <RetroButton
-            variant="primary"
-            size="medium"
-            onPress={() => {}}
-            style={styles.actionButton}
-          >
-            My Profile
-          </RetroButton>
-        </View>
-      </RetroWindow>
-
-      {/* Stats Window */}
-      <RetroWindow
-        title="Today's Stats"
-        color="purple"
-        style={styles.windowSection}
-      >
-        <View style={styles.statsContainer}>
-          <View style={styles.statItem}>
-            <Text style={[styles.statValue, { color: colors.primary }]}>0</Text>
-            <Text style={[styles.statLabel, { color: '#333333' }]}>Minutes</Text>
-            <Text style={[styles.statLabel, { color: '#666666' }]}>Studied</Text>
-          </View>
-          <View style={styles.divider} />
-          <View style={styles.statItem}>
-            <Text style={[styles.statValue, { color: colors.primary }]}>0</Text>
-            <Text style={[styles.statLabel, { color: '#333333' }]}>Topics</Text>
-            <Text style={[styles.statLabel, { color: '#666666' }]}>Completed</Text>
-          </View>
-          <View style={styles.divider} />
-          <View style={styles.statItem}>
-            <Text style={[styles.statValue, { color: colors.primary }]}>0%</Text>
-            <Text style={[styles.statLabel, { color: '#333333' }]}>Progress</Text>
-            <Text style={[styles.statLabel, { color: '#666666' }]}>Overall</Text>
-          </View>
-        </View>
-      </RetroWindow>
-
-      {/* Recent Activity */}
-      <RetroWindow
-        title="Recent Activity"
-        color="pink"
-        style={styles.windowSection}
-      >
-        {RECENT_ACTIVITIES.map((activity) => (
-          <View key={activity.id} style={styles.activityItem}>
-            <Text style={[styles.activityTitle, { color: '#000000' }]}>
-              {activity.type === 'completed' ? '[C]' : '[P]'} {activity.title}
-            </Text>
-            <Text style={[styles.activityTime, { color: '#666666' }]}>{activity.time}</Text>
-          </View>
-        ))}
-      </RetroWindow>
-
-      {/* Achievements */}
-      <RetroWindow
-        title="Achievements"
-        color="purple"
-        style={styles.windowSection}
-      >
-        <View style={styles.achievementsGrid}>
-          {ACHIEVEMENTS.map((achievement) => (
-            <View
-              key={achievement.id}
-              style={[
-                styles.achievementItem,
-                { opacity: achievement.unlocked ? 1 : 0.5 },
-              ]}
-            >
-              <Text style={styles.achievementIcon}>{achievement.icon}</Text>
-              <Text style={[styles.achievementName, { color: '#333333' }]}>
-                {achievement.name}
-              </Text>
-              {!achievement.unlocked && (
-                <Text style={[styles.lockedBadge, { color: '#999999' }]}>[L]</Text>
-              )}
+        {/* Learning Stats Grid */}
+        <View style={styles.statsGrid}>
+          <RetroWindow color="blue" style={styles.statCard}>
+            <View style={styles.statCardContent}>
+              <Text style={[styles.statValue, { color: colors.primary }]}>{mockUserStats.wordsLearned}</Text>
+              <Text style={[styles.statLabel, { color: '#333333' }]}>Words</Text>
             </View>
-          ))}
-        </View>
-      </RetroWindow>
+          </RetroWindow>
 
-      {/* Study Schedule */}
-      {/* <RetroWindow
-        title="Study Schedule"
-        color="pink"
-        style={[styles.windowSection, { marginBottom: 40 }]}
-      >
-        <View style={styles.scheduleContainer}>
-          <View style={styles.scheduleItem}>
-            <Text style={[styles.scheduleDay, { color: '#333333' }]}>Monday</Text>
-            <Text style={[styles.scheduleTime, { color: colors.primary }]}>2:00 PM</Text>
-          </View>
-          <View style={styles.scheduleItem}>
-            <Text style={[styles.scheduleDay, { color: '#333333' }]}>Wednesday</Text>
-            <Text style={[styles.scheduleTime, { color: colors.primary }]}>3:00 PM</Text>
-          </View>
-          <View style={styles.scheduleItem}>
-            <Text style={[styles.scheduleDay, { color: '#333333' }]}>Friday</Text>
-            <Text style={[styles.scheduleTime, { color: colors.primary }]}>2:30 PM</Text>
-          </View>
+          <RetroWindow color="purple" style={styles.statCard}>
+            <View style={styles.statCardContent}>
+              <Text style={[styles.statValue, { color: colors.primary }]}>{mockUserStats.phrasesLearned}</Text>
+              <Text style={[styles.statLabel, { color: '#333333' }]}>Phrases</Text>
+            </View>
+          </RetroWindow>
+
+          <RetroWindow color="mint" style={styles.statCard}>
+            <View style={styles.statCardContent}>
+              <Text style={[styles.statValue, { color: colors.primary }]}>{mockUserStats.totalEpisodesCompleted}</Text>
+              <Text style={[styles.statLabel, { color: '#333333' }]}>Episodes</Text>
+            </View>
+          </RetroWindow>
+
+          <RetroWindow color="indigo" style={styles.statCard}>
+            <View style={styles.statCardContent}>
+              <Text style={[styles.statValue, { color: colors.primary }]}>{mockUserStats.totalMinutesThisMonth}</Text>
+              <Text style={[styles.statLabel, { color: '#333333' }]}>Minutes</Text>
+            </View>
+          </RetroWindow>
         </View>
-      </RetroWindow> */}
-    </ScrollView>
+
+        {/* Today's Activity */}
+        <View style={styles.sectionContainer}>
+          <Text style={[styles.sectionTitle, { color: '#000000' }]}>Today's Activity</Text>
+          <RetroWindow color="pink">
+            <View style={styles.activityRow}>
+              <Text style={[styles.activityLabel, { color: '#333333' }]}>Minutes studied</Text>
+              <Text style={[styles.activityValue, { color: colors.primary }]}>{mockUserStats.minutesToday} min</Text>
+            </View>
+            <View style={[styles.progressBarBg, { backgroundColor: colors.accent + '40' }]}>
+              <View 
+                style={[
+                  styles.progressBarFill,
+                  { width: `${(mockUserStats.minutesToday / 60) * 100}%`, backgroundColor: colors.primary }
+                ]} 
+              />
+            </View>
+            <Text style={[styles.goalText, { color: '#666666' }]}>Goal: 30 minutes</Text>
+          </RetroWindow>
+        </View>
+         <RetroWindow
+                title="Today's Stats"
+                color="purple"
+                style={styles.windowSection}
+              >
+                <View style={styles.statsContainer}>
+                  <View style={styles.statItem}>
+                    <Text style={[styles.statValue, { color: colors.primary }]}>0</Text>
+                    <Text style={[styles.statLabel, { color: '#333333' }]}>Minutes</Text>
+                    <Text style={[styles.statLabel, { color: '#666666' }]}>Studied</Text>
+                  </View>
+                  <View style={styles.divider} />
+                  <View style={styles.statItem}>
+                    <Text style={[styles.statValue, { color: colors.primary }]}>0</Text>
+                    <Text style={[styles.statLabel, { color: '#333333' }]}>Topics</Text>
+                    <Text style={[styles.statLabel, { color: '#666666' }]}>Completed</Text>
+                  </View>
+                  <View style={styles.divider} />
+                  <View style={styles.statItem}>
+                    <Text style={[styles.statValue, { color: colors.primary }]}>0%</Text>
+                    <Text style={[styles.statLabel, { color: '#333333' }]}>Progress</Text>
+                    <Text style={[styles.statLabel, { color: '#666666' }]}>Overall</Text>
+                  </View>
+                </View>
+              </RetroWindow>
+
+        {/* Weekly Activity Chart */}
+        <View style={styles.sectionContainer}>
+          <Text style={[styles.sectionTitle, { color: '#000000' }]}>This Week</Text>
+          <RetroWindow title="Weekly Progress" color="blue">
+            <View style={styles.chartContainer}>
+              {weeklyData.map((day, index) => (
+                <View key={index} style={styles.chartBarWrapper}>
+                  <View style={styles.chartBarContainer}>
+                    <View
+                      style={[
+                        styles.chartBar,
+                        {
+                          height: day.minutes > 0 ? (day.minutes / maxMinutes) * 100 : 8,
+                          backgroundColor: day.minutes === 0 ? '#e0e0e0' : colors.primary,
+                        },
+                      ]}
+                    />
+                  </View>
+                  <Text style={[styles.chartLabel, { color: '#333333' }]}>{day.day}</Text>
+                </View>
+              ))}
+            </View>
+            <Text style={[styles.chartStats, { color: '#666666' }]}>
+              You studied <Text style={[styles.chartStatsBold, { color: '#333333' }]}>{mockUserStats.thisWeekEpisodes} episodes</Text> this week
+            </Text>
+          </RetroWindow>
+        </View>
+
+        {/* Monthly Stats */}
+        <View style={styles.sectionContainer}>
+          <Text style={[styles.sectionTitle, { color: '#000000' }]}>February Progress</Text>
+          <RetroWindow title="Monthly Stats" color="purple">
+            <View style={styles.monthlyRow}>
+              <Text style={[styles.monthlyLabel, { color: '#333333' }]}>Total minutes</Text>
+              <Text style={[styles.monthlyValue, { color: colors.primary }]}>{mockUserStats.totalMinutesThisMonth}</Text>
+            </View>
+            <View style={styles.monthlyRow}>
+              <Text style={[styles.monthlyLabel, { color: '#333333' }]}>Words learned</Text>
+              <Text style={[styles.monthlyValue, { color: colors.primary }]}>{mockUserStats.wordsLearned}</Text>
+            </View>
+            <View style={styles.monthlyRow}>
+              <Text style={[styles.monthlyLabel, { color: '#333333' }]}>Level</Text>
+              <Text style={[styles.monthlyValue, { color: colors.primary }]}>{mockUserStats.currentLevel}</Text>
+            </View>
+          </RetroWindow>
+        </View>
+
+        {/* Leaderboard */}
+        <View style={styles.sectionContainer}>
+          <Text style={[styles.sectionTitle, { color: '#000000' }]}>Leaderboard</Text>
+          <Text style={[styles.leaderboardSubtext, { color: '#666666' }]}>Words learned this month</Text>
+
+          <RetroWindow title="Top Players" color="mint">
+            {leaderboardData.map((user) => (
+              <View 
+                key={user.rank} 
+                style={[
+                  styles.leaderboardRow,
+                  user.rank === 3 && [styles.leaderboardRowHighlight, { backgroundColor: colors.primary + '15' }]
+                ]}
+              >
+                <View style={[styles.rankMedal, { backgroundColor: colors.primary + '20' }]}>
+                  <Text style={[styles.rankNumber, { color: colors.primary }]}>
+                    {user.rank}
+                  </Text>
+                </View>
+
+                <View style={styles.userInfo}>
+                  <Text style={[styles.userName, { color: '#333333' }]}>
+                    {user.name}
+                  </Text>
+                  <Text style={[styles.userStats, { color: '#666666' }]}>
+                    {user.wordsLearned} words • {user.streak}d streak
+                  </Text>
+                </View>
+
+                <View style={[styles.userBadge, { backgroundColor: colors.primary + '20' }]}>
+                  <Text style={[styles.badgeText, { color: colors.primary }]}>
+                    {user.wordsLearned}
+                  </Text>
+                </View>
+              </View>
+            ))}
+          </RetroWindow>
+        </View>
+
+        {/* Motivation Banner */}
+        <RetroWindow color="indigo" style={styles.banner}>
+          <Text style={[styles.bannerText, { color: '#333333' }]}>
+            Complete one more episode today and maintain your streak!
+          </Text>
+        </RetroWindow>
+
+        <View style={{ height: 20 }} />
+      </ScrollView>
     </SafeAreaView>
   );
 }
@@ -221,177 +231,271 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-  content: {
-    padding: 16,
+  scrollContent: {
+    paddingHorizontal: 20,
     paddingTop: 20,
   },
-  windowSection: {
-    marginBottom: 16,
+  header: {
+    marginBottom: 24,
   },
   title: {
-    fontSize: 24,
-    fontWeight: 'bold',
+    fontSize: 32,
+    fontWeight: '700',
+    fontFamily: Fonts.mono,
     marginBottom: 8,
-    letterSpacing: 0.5,
-    fontFamily: Fonts.rounded,
   },
   subtitle: {
-    fontSize: 14,
-    lineHeight: 20,
-    fontFamily: Fonts.sans,
+    fontSize: 15,
+    opacity: 0.6,
+    fontWeight: '500',
+    fontFamily: Fonts.mono,
   },
-  /* Streak Styles */
-  streakContainer: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 16,
+
+  // Streak Card
+  streakCard: {
+    marginBottom: 24,
   },
-  streakNumber: {
-    fontSize: 48,
-    fontWeight: 'bold',
-    fontFamily: Fonts.rounded,
+  streakContent: {
+    flex: 1,
   },
   streakLabel: {
-    fontSize: 18,
+    fontSize: 13,
     fontWeight: '600',
-    marginTop: 4,
-    fontFamily: Fonts.sans,
+    fontFamily: Fonts.mono,
+    marginBottom: 4,
+  },
+  streakValue: {
+    fontSize: 32,
+    fontWeight: '800',
+    fontFamily: Fonts.mono,
+    marginBottom: 4,
   },
   streakSubtext: {
     fontSize: 12,
-    marginTop: 4,
-    fontFamily: Fonts.sans,
   },
-  /* Goal Styles */
-  goalContainer: {
-    paddingVertical: 12,
+  streakBadge: {
+    backgroundColor: '#FF9800',
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 20,
+    marginTop: 12,
+    alignSelf: 'flex-start',
   },
-  progressBar: {
-    height: 24,
-    backgroundColor: '#EEEEEE',
-    borderRadius: 12,
-    borderWidth: 2,
-    borderColor: '#000000',
-    overflow: 'hidden',
-    marginBottom: 12,
+  streakBadgeText: {
+    fontSize: 12,
+    fontWeight: '700',
+    fontFamily: Fonts.mono,
+    color: '#fff',
   },
-  progressFill: {
-    height: '100%',
-    borderRadius: 10,
+
+  // Stats Grid
+  statsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
+    marginBottom: 28,
   },
-  goalText: {
-    fontSize: 13,
-    fontFamily: Fonts.sans,
+  statCard: {
+    flex: 1,
+    minWidth: '47%',
+  },
+  statCardContent: {
+    alignItems: 'center',
+    padding: 8,
+  },
+  statValue: {
+    fontSize: 22,
+    fontWeight: '700',
+    fontFamily: Fonts.mono,
+    marginBottom: 4,
+  },
+  statLabel: {
+    fontSize: 12,
+    fontWeight: '500',
+    fontFamily: Fonts.mono,
     textAlign: 'center',
   },
-  buttonGrid: {
-    flexDirection: 'row',
-    gap: 12,
+
+  // Section Container
+  sectionContainer: {
+    marginBottom: 24,
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    fontFamily: Fonts.mono,
     marginBottom: 12,
   },
-  actionButton: {
+
+  // Today's Activity
+  activityRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  activityLabel: {
+    fontSize: 14,
+    fontWeight: '500',
+    fontFamily: Fonts.mono,
+  },
+  activityValue: {
+    fontSize: 16,
+    fontWeight: '700',
+    fontFamily: Fonts.mono,
+  },
+  progressBarBg: {
+    height: 6,
+    borderRadius: 3,
+    overflow: 'hidden',
+    marginBottom: 8,
+  },
+  progressBarFill: {
+    height: '100%',
+    borderRadius: 3,
+    backgroundColor: '#4CAF50',
+  },
+  goalText: {
+    fontSize: 12,
+  },
+
+  // Chart
+  chartContainer: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    justifyContent: 'space-around',
+    height: 120,
+    marginBottom: 16,
+  },
+  chartBarWrapper: {
+    alignItems: 'center',
     flex: 1,
   },
-  statsContainer: {
+  chartBarContainer: {
+    width: '80%',
+    height: 100,
+    justifyContent: 'flex-end',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  chartBar: {
+    width: '100%',
+    borderRadius: 4,
+  },
+  chartLabel: {
+    fontSize: 12,
+    fontWeight: '600',
+    fontFamily: Fonts.mono,
+  },
+  chartStats: {
+    fontSize: 13,
+    textAlign: 'center',
+  },
+  chartStatsBold: {
+    fontWeight: '700',
+    fontFamily: Fonts.mono,
+  },
+
+  // Monthly Stats
+  monthlyRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(0,0,0,0.1)',
+  },
+  monthlyLabel: {
+    fontSize: 14,
+    fontWeight: '500',
+    fontFamily: Fonts.mono,
+  },
+  monthlyValue: {
+    fontSize: 16,
+    fontWeight: '700',
+    fontFamily: Fonts.mono,
+  },
+
+  // Leaderboard
+  leaderboardSubtext: {
+    fontSize: 13,
+    marginBottom: 12,
+  },
+  leaderboardRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 0,
+    paddingVertical: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(0,0,0,0.1)',
+  },
+  leaderboardRowHighlight: {
+    backgroundColor: 'rgba(76, 175, 80, 0.15)',
+  },
+  rankMedal: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+    backgroundColor: 'rgba(76, 175, 80, 0.1)',
+  },
+  rankNumber: {
+    fontSize: 18,
+    fontWeight: '700',
+    fontFamily: Fonts.mono,
+  },
+  userInfo: {
+    flex: 1,
+  },
+  userName: {
+    fontSize: 14,
+    fontWeight: '600',
+    fontFamily: Fonts.mono,
+    marginBottom: 2,
+  },
+  userStats: {
+    fontSize: 12,
+  },
+  userBadge: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 6,
+  },
+  badgeText: {
+    fontSize: 13,
+    fontWeight: '700',
+    fontFamily: Fonts.mono,
+  },
+
+  // Banner
+  banner: {
+    marginTop: 8,
+  },
+  bannerText: {
+    fontSize: 13,
+    fontWeight: '500',
+    fontFamily: Fonts.mono,
+    lineHeight: 20,
+  },
+
+   windowSection: {
+    marginBottom: 16,
+  },
+
+   statsContainer: {
     flexDirection: 'row',
     justifyContent: 'space-around',
     alignItems: 'center',
   },
-  statItem: {
+   statItem: {
     alignItems: 'center',
     flex: 1,
   },
-  statValue: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    marginBottom: 4,
-    fontFamily: Fonts.rounded,
-  },
-  statLabel: {
-    fontSize: 12,
-    fontWeight: '600',
-    lineHeight: 16,
-    fontFamily: Fonts.sans,
-  },
-  divider: {
+   divider: {
     width: 1,
     height: 60,
     backgroundColor: '#CCCCCC',
-  },
-  /* Activity Styles */
-  activityItem: {
-    paddingVertical: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: '#EEEEEE',
-  },
-  activityTitle: {
-    fontSize: 14,
-    fontWeight: '600',
-    fontFamily: Fonts.sans,
-  },
-  activityTime: {
-    fontSize: 12,
-    marginTop: 4,
-    fontFamily: Fonts.sans,
-  },
-  /* Achievement Styles */
-  achievementsGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'space-between',
-    gap: 12,
-  },
-  achievementItem: {
-    width: '48%',
-    backgroundColor: '#F5F5F5',
-    borderRadius: 12,
-    borderWidth: 2,
-    borderColor: '#DDDDDD',
-    paddingVertical: 12,
-    alignItems: 'center',
-  },
-  achievementIcon: {
-    fontSize: 32,
-    marginBottom: 4,
-  },
-  achievementName: {
-    fontSize: 11,
-    fontWeight: '600',
-    textAlign: 'center',
-    fontFamily: Fonts.sans,
-  },
-  lockedBadge: {
-    fontSize: 10,
-    marginTop: 4,
-  },
-  /* Schedule Styles */
-  scheduleContainer: {
-    gap: 10,
-  },
-  scheduleItem: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    paddingVertical: 10,
-    paddingHorizontal: 8,
-    backgroundColor: '#F9F9F9',
-    borderRadius: 8,
-    borderLeftWidth: 4,
-    borderLeftColor: '#FFB6D9',
-  },
-  scheduleDay: {
-    fontSize: 14,
-    fontWeight: '600',
-    fontFamily: Fonts.sans,
-  },
-  scheduleTime: {
-    fontSize: 14,
-    fontWeight: 'bold',
-    fontFamily: Fonts.rounded,
-  },
-  tipText: {
-    fontSize: 14,
-    lineHeight: 20,
-    fontStyle: 'italic',
-    fontFamily: Fonts.sans,
   },
 });
