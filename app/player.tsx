@@ -1,5 +1,5 @@
 // app/player.tsx
-import { VideoPlayer } from '@/components/VideoPlayer';
+import VideoPlayer from '@/components/VideoPlayer';
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useEpisodeUpload } from '@/hooks/useEpisodeUpload';

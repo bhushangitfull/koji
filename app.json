@@ -14,7 +14,9 @@
     "android": {
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
-      "screenOrientation": "sensor"
+      "screenOrientation": "sensor",
+      "permissions": [],
+      "package": "com.anonymous.Koji"
     },
     "web": {
       "favicon": "./assets/images/favicon.png"
@@ -41,7 +43,8 @@
           }
         }
       ],
-      "expo-video"
+      "expo-video",
+      "react-native-video"
     ],
     "experiments": {
       "typedRoutes": true,
