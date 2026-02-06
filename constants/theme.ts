@@ -89,10 +89,10 @@ export const Fonts = Platform.select({
     mono: 'VT323',
   },
   default: {
-    sans: 'VT323',
-    serif: 'VT323',
-    rounded: 'VT323',
-    mono: 'VT323',
+    sans: 'SpaceMono-Regular',
+    serif: 'SpaceMono-Regular',
+    rounded: 'SpaceMono-Regular',
+    mono: 'SpaceMono-Regular',
   },
   web: {
     sans: "'SpaceMono', monospace",
@@ -100,4 +100,10 @@ export const Fonts = Platform.select({
     rounded: "'SpaceMono', monospace",
     mono: "'SpaceMono', monospace",
   },
+  android:{
+     sans: "'SpaceMono', monospace",
+    serif: "'SpaceMono', monospace",
+    rounded: "'SpaceMono', monospace",
+    mono: "'SpaceMono', monospace",
+  }
 });

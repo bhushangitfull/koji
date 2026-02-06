@@ -1,11 +1,11 @@
- import { VideoPlayer } from '@/components/VideoPlayer';
+// app/player.tsx
+import { VideoPlayer } from '@/components/VideoPlayer';
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useEpisodeUpload } from '@/hooks/useEpisodeUpload';
 import { Feather } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import * as ScreenOrientation from 'expo-screen-orientation';
-import React, { useEffect } from 'react';
+import React from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 export default function PlayerScreen() {
@@ -15,42 +15,10 @@ export default function PlayerScreen() {
   const { episodeId } = useLocalSearchParams<{ episodeId: string }>();
   const { episodes } = useEpisodeUpload();
 
-  // Lock orientation to portrait when entering this screen
-  useEffect(() => {
-    const setupOrientation = async () => {
-      try {
-        await ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP);
-      } catch (err) {
-        console.error('Error setting orientation:', err);
-      }
-    };
-    
-    setupOrientation();
-
-    // Cleanup: ensure portrait orientation when leaving this screen
-    return () => {
-      ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP).catch(err => {
-        console.error('Error restoring orientation on unmount:', err);
-      });
-    };
-  }, []);
-
-  useEffect(() => {
-    console.log('Player screen - episodeId:', episodeId);
-    console.log('Player screen - episodes:', episodes.map(e => ({ id: e.id, title: e.title, uri: e.videoUri })));
-  }, [episodeId, episodes]);
-
   const episode = episodes.find((e) => e.id === episodeId);
 
-  const handleBack = async () => {
-    try {
-      // Ensure portrait before navigating back
-      await ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP);
-      router.back();
-    } catch (err) {
-      console.error('Error on back:', err);
-      router.back();
-    }
+  const handleBack = () => {
+    router.back();
   };
 
   if (!episode) {
@@ -58,8 +26,12 @@ export default function PlayerScreen() {
       <View style={[styles.container, { backgroundColor: colors.background }]}>
         <View style={styles.errorContainer}>
           <Feather name="alert-circle" size={48} color={colors.primary} />
-          <Text style={[styles.errorText, { color: colors.primary }]}>Episode not found</Text>
-          <Text style={[styles.errorSubtext, { color: '#999' }]}>ID: {episodeId}</Text>
+          <Text style={[styles.errorText, { color: colors.primary }]}>
+            Episode not found
+          </Text>
+          <Text style={[styles.errorSubtext, { color: '#999' }]}>
+            ID: {episodeId}
+          </Text>
           <Text style={[styles.errorSubtext, { color: '#999' }]}>
             Available: {episodes.length} episodes
           </Text>
@@ -74,38 +46,27 @@ export default function PlayerScreen() {
     );
   }
 
-  console.log('Rendering video player with URI:', episode.videoUri);
+  // Parse subtitles if available
+  const subtitles = episode.subtitles?.map(sub => ({
+    startTime: sub.startTime || 0,
+    endTime: sub.endTime || 0,
+    text: sub.text || '',
+  })) || [];
 
   return (
     <View style={styles.container}>
       <VideoPlayer
         videoUri={episode.videoUri}
         title={episode.title}
-        subtitles={episode.subtitles}
+        subtitles={subtitles}
+        onBack={handleBack}
       />
-      
-      <TouchableOpacity 
-        style={styles.backButton}
-        onPress={handleBack}
-      >
-        <Feather name="x" size={28} color="white" />
-      </TouchableOpacity>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
-    flex: 1,
-    backgroundColor: '#000000',
-  },
-  header: {
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  playerContainer: {
     flex: 1,
     backgroundColor: '#000000',
   },
@@ -127,7 +88,7 @@ const styles = StyleSheet.create({
   },
   backButton: {
     position: 'absolute',
-    top: 16,
+    top: 50,
     right: 16,
     zIndex: 1000,
     padding: 8,

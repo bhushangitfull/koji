@@ -24,7 +24,9 @@
       [
         "expo-font",
         {
-          "fonts": ["./assets/fonts/VT323-Regular.ttf"]
+          "fonts": [
+            "./assets/fonts/VT323-Regular.ttf"
+          ]
         }
       ],
       [
@@ -38,7 +40,8 @@
             "backgroundColor": "#000000"
           }
         }
-      ]
+      ],
+      "expo-video"
     ],
     "experiments": {
       "typedRoutes": true,
