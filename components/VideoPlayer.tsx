@@ -1,149 +1,97 @@
-import { Ionicons } from '@expo/vector-icons';
-import { useEventListener } from 'expo';
-import { VideoView, useVideoPlayer } from 'expo-video';
-import React, { useRef, useState } from 'react';
-import {
-  PanResponder,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
-  useWindowDimensions
-} from 'react-native';
+import { Ionicons, MaterialIcons } from '@expo/vector-icons';
+import { useVideoPlayer, VideoView } from 'expo-video'; // Works in Expo Go
+import React, { useEffect, useRef, useState } from 'react';
+import { Dimensions, PanResponder, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
-export const VideoPlayer = ({ videoUri, title, onBack }) => {
-  const { width: windowWidth } = useWindowDimensions();
-  
-  // 1. Setup Player with the CRITICAL timeUpdateEventInterval
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
+
+export default function CustomPlayer({ videoUri, title, onBack }) {
+  const isDragging = useRef(false);
+  const [currentTime, setCurrentTime] = useState(0);
+  const [duration, setDuration] = useState(0);
+  const [isPlaying, setIsPlaying] = useState(true);
+
+  // Initialize the Expo Video Player
   const player = useVideoPlayer(videoUri, (p) => {
-    p.loop = false;
-    p.timeUpdateEventInterval = 0.1; // Updates every 100ms
     p.play();
   });
 
-  const [isPlaying, setIsPlaying] = useState(false);
-  const [duration, setDuration] = useState(0);
-  const [currentTime, setCurrentTime] = useState(0); 
-  const [controlsVisible, setControlsVisible] = useState(true);
-  const isDragging = useRef(false);
+  // Sync the UI with the native player
+  useEffect(() => {
+    const timeSub = player.addListener('timeUpdate', (event) => {
+      if (!isDragging.current) {
+        setCurrentTime(event.currentTime);
+        if (duration === 0) setDuration(player.duration);
+      }
+    });
 
-  // 2. Listeners
-  useEventListener(player, 'playingChange', (event) => setIsPlaying(event.isPlaying));
-  
-  useEventListener(player, 'timeUpdate', (event) => {
-    // ONLY update state from the player if we aren't currently sliding
-    if (!isDragging.current) {
-      setCurrentTime(event.currentTime);
-      if (duration === 0) setDuration(player.duration);
-    }
-  });
+    const statusSub = player.addListener('playingChange', (event) => {
+      setIsPlaying(event.isPlaying);
+    });
 
-  // 3. Seeking Logic (FIXED)
-  const seekTo = (seconds: number) => {
-    const newTime = Math.max(0, Math.min(seconds, player.duration));
-    // Step A: Update the native player
-    player.currentTime = newTime; 
-    // Step B: Update local state immediately so the UI doesn't jump back
-    setCurrentTime(newTime);
-  };
+    return () => {
+      timeSub.remove();
+      statusSub.remove();
+    };
+  }, [player, duration]);
 
   const handleSkip = (amount: number) => {
-    seekTo(player.currentTime + amount);
+    player.currentTime = Math.max(0, Math.min(player.currentTime + amount, player.duration));
   };
 
-  // 4. Slider Logic
   const panResponder = useRef(
     PanResponder.create({
       onStartShouldSetPanResponder: () => true,
-      onPanResponderGrant: () => {
-        isDragging.current = true;
-      },
       onPanResponderMove: (evt) => {
-        const padding = 20;
-        const barWidth = windowWidth - (padding * 2);
-        const touchX = evt.nativeEvent.pageX - padding;
-        const percent = Math.max(0, Math.min(touchX / barWidth, 1));
-        
-        // Update UI locally while dragging
-        setCurrentTime(percent * player.duration);
+        isDragging.current = true;
+        const pos = (evt.nativeEvent.pageX - 20) / (SCREEN_WIDTH - 40);
+        setCurrentTime(Math.max(0, Math.min(pos, 1)) * player.duration);
       },
       onPanResponderRelease: (evt) => {
-        const padding = 20;
-        const barWidth = windowWidth - (padding * 2);
-        const touchX = evt.nativeEvent.pageX - padding;
-        const percent = Math.max(0, Math.min(touchX / barWidth, 1));
-        
-        seekTo(percent * player.duration);
+        const pos = (evt.nativeEvent.pageX - 20) / (SCREEN_WIDTH - 40);
+        player.currentTime = Math.max(0, Math.min(pos, 1)) * player.duration;
         isDragging.current = false;
       },
     })
   ).current;
 
-  const formatTime = (secs: number) => {
-    const s = Math.floor(secs || 0);
-    const m = Math.floor(s / 60);
-    const r = s % 60;
-    return `${m}:${r.toString().padStart(2, '0')}`;
-  };
-
   return (
     <View style={styles.container}>
       <VideoView player={player} style={styles.video} nativeControls={false} />
-
-      <View style={styles.overlay}>
-        {/* Top Bar */}
-        <View style={styles.topBar}>
+      
+      <View style={styles.uiLayer}>
+        <View style={styles.header}>
           <TouchableOpacity onPress={onBack}><Ionicons name="arrow-back" size={28} color="white" /></TouchableOpacity>
           <Text style={styles.title}>{title}</Text>
         </View>
 
-        {/* Center Controls */}
-        <View style={styles.centerRow}>
-          <TouchableOpacity onPress={() => handleSkip(-10)} style={styles.btn}>
-            <Ionicons name="play-back" size={40} color="white" />
+        <View style={styles.controlsRow}>
+          <TouchableOpacity onPress={() => handleSkip(-10)}><MaterialIcons name="replay-10" size={45} color="white" /></TouchableOpacity>
+          <TouchableOpacity style={styles.playBtn} onPress={() => isPlaying ? player.pause() : player.play()}>
+            <Ionicons name={isPlaying ? "pause" : "play"} size={54} color="white" />
           </TouchableOpacity>
-
-          <TouchableOpacity onPress={() => isPlaying ? player.pause() : player.play()} style={styles.playBtn}>
-            <Ionicons name={isPlaying ? "pause" : "play"} size={50} color="white" />
-          </TouchableOpacity>
-
-          <TouchableOpacity onPress={() => handleSkip(10)} style={styles.btn}>
-            <Ionicons name="play-forward" size={40} color="white" />
-          </TouchableOpacity>
+          <TouchableOpacity onPress={() => handleSkip(10)}><MaterialIcons name="forward-10" size={45} color="white" /></TouchableOpacity>
         </View>
 
-        {/* Bottom Bar */}
-        <View style={styles.bottomBar}>
-          <View style={styles.sliderWrapper} {...panResponder.panHandlers}>
-            <View style={styles.track}>
-              <View style={[styles.fill, { width: `${(currentTime / (duration || 1)) * 100}%` }]} />
-              <View style={[styles.knob, { left: `${(currentTime / (duration || 1)) * 100}%` }]} />
-            </View>
-          </View>
-          <View style={styles.timeRow}>
-            <Text style={styles.time}>{formatTime(currentTime)}</Text>
-            <Text style={styles.time}>{formatTime(duration)}</Text>
+        <View style={styles.footer}>
+          <View style={styles.progressBar} {...panResponder.panHandlers}>
+            <View style={[styles.progressFill, { width: `${(currentTime / (duration || 1)) * 100}%` }]} />
           </View>
         </View>
       </View>
     </View>
   );
-};
+}
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#000' },
-  video: { flex: 1 },
-  overlay: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.3)', justifyContent: 'space-between' },
-  topBar: { flexDirection: 'row', alignItems: 'center', paddingTop: 50, paddingHorizontal: 20 },
-  title: { color: 'white', fontSize: 18, marginLeft: 15, fontWeight: 'bold' },
-  centerRow: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center' },
-  playBtn: { width: 80, height: 80, borderRadius: 40, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center', marginHorizontal: 20 },
-  btn: { padding: 10 },
-  bottomBar: { paddingHorizontal: 20, paddingBottom: 40 },
-  sliderWrapper: { height: 40, justifyContent: 'center' },
-  track: { height: 4, backgroundColor: 'rgba(255,255,255,0.3)', borderRadius: 2, position: 'relative' },
-  fill: { height: '100%', backgroundColor: '#FFB6D9', borderRadius: 2 },
-  knob: { position: 'absolute', width: 16, height: 16, borderRadius: 8, backgroundColor: '#FFB6D9', top: -6, marginLeft: -8 },
-  timeRow: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 10 },
-  time: { color: 'white', fontSize: 12 }
+  video: { ...StyleSheet.absoluteFillObject },
+  uiLayer: { ...StyleSheet.absoluteFillObject, justifyContent: 'space-between', padding: 20, backgroundColor: 'rgba(0,0,0,0.3)' },
+  header: { flexDirection: 'row', alignItems: 'center', paddingTop: 50 },
+  title: { color: 'white', fontSize: 18, marginLeft: 10, fontWeight: 'bold' },
+  controlsRow: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center' },
+  playBtn: { width: 80, height: 80, borderRadius: 40, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center', marginHorizontal: 30 },
+  footer: { paddingBottom: 40 },
+  progressBar: { height: 10, backgroundColor: 'rgba(255,255,255,0.3)', borderRadius: 5, overflow: 'hidden' },
+  progressFill: { height: '100%', backgroundColor: '#3b82f6' }
 });
