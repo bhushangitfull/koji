@@ -1,8 +1,9 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useEventListener } from 'expo';
+import { useEvent, useEventListener } from 'expo';
 import { VideoView, useVideoPlayer } from 'expo-video';
-import React, { useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
+  Dimensions,
   PanResponder,
   StyleSheet,
   Text,
@@ -10,73 +11,97 @@ import {
   View
 } from 'react-native';
 
-export default function CustomPlayer({ videoUri, title, onBack }) {
-  const isDragging = useRef(false);
-  const [currentTime, setCurrentTime] = useState(0);
-  const [duration, setDuration] = useState(0);
-  const [isPlaying, setIsPlaying] = useState(true);
+const { width: windowWidth } = Dimensions.get('window');
 
-  // Initialize the Expo Video Player
+export default function CustomPlayer({ videoUri, title, onBack }) {
+
+  const isDragging = useRef(false);
+
+
+  // 1. Consolidated State
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [duration, setDuration] = useState(0);
+  const [currentTime, setCurrentTime] = useState(0);
+  const [barWidth, setBarWidth] = useState(0);
+
+
   const player = useVideoPlayer(videoUri, (p) => {
     p.play();
   });
 
-  const [isPlaying, setIsPlaying] = useState(false);
-  const [duration, setDuration] = useState(0);
-  const [currentTime, setCurrentTime] = useState(0); 
-  const [controlsVisible, setControlsVisible] = useState(true);
-  const isDragging = useRef(false);
+  const { status } = useEvent(player, 'statusChange', { status: player.status });
 
-  // 2. Listeners
-  useEventListener(player, 'playingChange', (event) => setIsPlaying(event.isPlaying));
-  
-  useEventListener(player, 'timeUpdate', (event) => {
-    // ONLY update state from the player if we aren't currently sliding
-    if (!isDragging.current) {
-      setCurrentTime(event.currentTime);
-      if (duration === 0) setDuration(player.duration);
+  useEffect(() => {
+    if (status === 'readyToPlay' && player.duration > 0) {
+      setDuration(player.duration);
+    }
+  }, [status, player.duration]);
+
+  // 2. Listen for Metadata/Status changes
+  // This ensures duration updates as soon as the video loads
+  useEventListener(player, 'statusChange', (event) => {
+    if (event.status === 'readyToPlay') {
+      setDuration(player.duration);
     }
   });
 
-  // 3. Seeking Logic (FIXED)
-  const seekTo = (seconds: number) => {
-    const newTime = Math.max(0, Math.min(seconds, player.duration));
-    // Step A: Update the native player
-    player.currentTime = newTime; 
-    // Step B: Update local state immediately so the UI doesn't jump back
+  useEventListener(player, 'playingChange', (event) => {
+    setIsPlaying(event.isPlaying);
+  });
+
+  useEventListener(player, 'timeUpdate', (event) => {
+    if (!isDragging.current) {
+      setCurrentTime(event.currentTime);
+      // Fallback: update duration if it was missed during statusChange
+      if (duration === 0 && player.duration > 0) {
+        setDuration(player.duration);
+      }
+    }
+  });
+
+  const seekTo = (seconds) => {
+    if (!player || duration <= 0) return;
+    const newTime = Math.max(0, Math.min(seconds, duration));
+
+    player.currentTime = newTime;
     setCurrentTime(newTime);
+
+    // Android Fix: Ensure player doesn't stick in pause after seek
+    if (isPlaying) {
+      setTimeout(() => player.play(), 50);
+    }
   };
 
-  const handleSkip = (amount: number) => {
+
+
+  const handleSkip = (amount) => {
     seekTo(player.currentTime + amount);
   };
 
-  // 4. Slider Logic
+  // 3. Slider Logic with dragging safety
   const panResponder = useRef(
     PanResponder.create({
       onStartShouldSetPanResponder: () => true,
-      onPanResponderMove: (evt) => {
-        const padding = 20;
-        const barWidth = windowWidth - (padding * 2);
-        const touchX = evt.nativeEvent.pageX - padding;
-        const percent = Math.max(0, Math.min(touchX / barWidth, 1));
-        
-        // Update UI locally while dragging
-        setCurrentTime(percent * player.duration);
+      onMoveShouldSetPanResponder: () => true,
+      onPanResponderGrant: () => {
+        isDragging.current = true;
       },
-      onPanResponderRelease: (evt) => {
-        const padding = 20;
-        const barWidth = windowWidth - (padding * 2);
-        const touchX = evt.nativeEvent.pageX - padding;
-        const percent = Math.max(0, Math.min(touchX / barWidth, 1));
-        
-        seekTo(percent * player.duration);
-        isDragging.current = false;
+      onPanResponderMove: (evt, gestureState) => {
+        // Use moveX (absolute) and subtract the slider's start position
+        // For simplicity, if full-screen: (gestureState.moveX / barWidth)
+        const percent = Math.max(0, Math.min(gestureState.moveX / (barWidth || 1), 1));
+        setCurrentTime(percent * duration);
+      },
+      onPanResponderRelease: (evt, gestureState) => {
+        const percent = Math.max(0, Math.min(gestureState.moveX / (barWidth || 1), 1));
+        seekTo(percent * duration);
+        // Give the native player a moment to catch up before resuming timeUpdates
+        setTimeout(() => { isDragging.current = false; }, 200);
       },
     })
   ).current;
 
-  const formatTime = (secs: number) => {
+  const formatTime = (secs) => {
     const s = Math.floor(secs || 0);
     const m = Math.floor(s / 60);
     const r = s % 60;
@@ -84,23 +109,26 @@ export default function CustomPlayer({ videoUri, title, onBack }) {
   };
 
   return (
-    <View style={styles.container}>
-      <VideoView player={player} style={styles.video} nativeControls={false} />
+    <View style={styles.container} >
+      <VideoView player={player} style={styles.video} nativeControls={false} surfaceType="textureView" />
 
       <View style={styles.overlay}>
-        {/* Top Bar */}
         <View style={styles.topBar}>
-          <TouchableOpacity onPress={onBack}><Ionicons name="arrow-back" size={28} color="white" /></TouchableOpacity>
+          <TouchableOpacity onPress={onBack}>
+            <Ionicons name="arrow-back" size={28} color="white" />
+          </TouchableOpacity>
           <Text style={styles.title}>{title}</Text>
         </View>
 
-        {/* Center Controls */}
         <View style={styles.centerRow}>
           <TouchableOpacity onPress={() => handleSkip(-10)} style={styles.btn}>
             <Ionicons name="play-back" size={40} color="white" />
           </TouchableOpacity>
 
-          <TouchableOpacity onPress={() => isPlaying ? player.pause() : player.play()} style={styles.playBtn}>
+          <TouchableOpacity
+            onPress={() => isPlaying ? player.pause() : player.play()}
+            style={styles.playBtn}
+          >
             <Ionicons name={isPlaying ? "pause" : "play"} size={50} color="white" />
           </TouchableOpacity>
 
@@ -109,14 +137,18 @@ export default function CustomPlayer({ videoUri, title, onBack }) {
           </TouchableOpacity>
         </View>
 
-        {/* Bottom Bar */}
         <View style={styles.bottomBar}>
-          <View style={styles.sliderWrapper} {...panResponder.panHandlers}>
+          <View
+            style={styles.sliderWrapper}
+            {...panResponder.panHandlers}
+            onLayout={(e) => setBarWidth(e.nativeEvent.layout.width)}
+          >
             <View style={styles.track}>
               <View style={[styles.fill, { width: `${(currentTime / (duration || 1)) * 100}%` }]} />
               <View style={[styles.knob, { left: `${(currentTime / (duration || 1)) * 100}%` }]} />
             </View>
           </View>
+
           <View style={styles.timeRow}>
             <Text style={styles.time}>{formatTime(currentTime)}</Text>
             <Text style={styles.time}>{formatTime(duration)}</Text>
@@ -126,6 +158,7 @@ export default function CustomPlayer({ videoUri, title, onBack }) {
     </View>
   );
 }
+
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#000' },
