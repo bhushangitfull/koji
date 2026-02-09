@@ -174,6 +174,52 @@ export const useEpisodeUpload = () => {
     }
   }, []);
 
+  const updateSubtitles = useCallback(
+    async (episodeId: string, subtitleUri: string): Promise<void> => {
+      try {
+        setIsLoading(true);
+        setError(null);
+
+        const episode = episodes.find((ep) => ep.id === episodeId);
+        if (!episode) throw new Error('Episode not found');
+
+        // Save subtitle file to episode directory
+        const subtitleFileName = subtitleUri.split('/').pop() || `subtitles.srt`;
+        const savedSubtitleUri = await saveFileToEpisode(
+          episodeId,
+          subtitleUri,
+          subtitleFileName
+        );
+
+        // Parse subtitles
+        const subtitleContent = await readSubtitleFile(savedSubtitleUri);
+        const parsed = parseSubtitles(subtitleContent);
+
+        // Update episode with new subtitles
+        setEpisodes((prev) => {
+          const updated = prev.map((ep) =>
+            ep.id === episodeId
+              ? {
+                  ...ep,
+                  subtitleUri: savedSubtitleUri,
+                  subtitles: parsed.subtitles,
+                }
+              : ep
+          );
+          saveEpisodes(updated);
+          return updated;
+        });
+      } catch (err) {
+        const errorMessage = err instanceof Error ? err.message : 'Unknown error';
+        setError(errorMessage);
+        throw err;
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    [episodes, saveEpisodes]
+  );
+
   return {
     episodes,
     isLoading,
@@ -182,5 +228,6 @@ export const useEpisodeUpload = () => {
     deleteEpisode,
     getEpisode,
     loadLocalEpisodes,
+    updateSubtitles,
   };
 };

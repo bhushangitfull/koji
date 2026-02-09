@@ -1,15 +1,15 @@
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, FlatList, Alert } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
-import { Feather, MaterialIcons } from '@expo/vector-icons';
 import { RetroButton } from '@/components/ui/retro-button';
 import { RetroWindow } from '@/components/ui/retro-window';
 import { Colors, Fonts } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useEpisodeUpload } from '@/hooks/useEpisodeUpload';
-import { useCallback, useEffect } from 'react';
+import { formatFileSize, initializeAppDirectories } from '@/utils/fileSystem';
+import { Feather, MaterialIcons } from '@expo/vector-icons';
 import * as DocumentPicker from 'expo-document-picker';
-import { initializeAppDirectories, formatFileSize } from '@/utils/fileSystem';
+import { useRouter } from 'expo-router';
+import { useCallback, useEffect } from 'react';
+import { Alert, FlatList, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 const getStatusColor = (status: string) => {
   switch (status) {
@@ -41,7 +41,7 @@ export default function LibraryScreen() {
   const router = useRouter();
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
-  const { episodes, uploadEpisode, deleteEpisode, isLoading } = useEpisodeUpload();
+  const { episodes, uploadEpisode, deleteEpisode, updateSubtitles, isLoading } = useEpisodeUpload();
 
   // Initialize app directories on mount
   useEffect(() => {
@@ -67,7 +67,7 @@ export default function LibraryScreen() {
 
       const videoFile = videoResult.assets[0];
       console.log('Selected video:', videoFile);
-      
+
       if (videoFile.size && videoFile.size > 2 * 1024 * 1024 * 1024) {
         Alert.alert('File too large', 'Video files must be under 2GB');
         return;
@@ -77,7 +77,7 @@ export default function LibraryScreen() {
 
       // Ask if user wants to add subtitles
       let subtitleUri: string | null = null;
-      
+
       await new Promise((resolve) => {
         Alert.alert(
           'Add Subtitles?',
@@ -120,7 +120,7 @@ export default function LibraryScreen() {
   const handleDelete = useCallback(
     (episodeId: string) => {
       Alert.alert('Delete Episode', 'Are you sure?', [
-        { text: 'Cancel', onPress: () => {} },
+        { text: 'Cancel', onPress: () => { } },
         {
           text: 'Delete',
           onPress: () => {
@@ -134,6 +134,42 @@ export default function LibraryScreen() {
     },
     [deleteEpisode]
   );
+
+  const handleAddSubtitle = useCallback(
+    (episodeId: string) => {
+      DocumentPicker.getDocumentAsync({
+        type: ['*/*'],  // Allow ALL file types
+        copyToCacheDirectory: true,
+      })
+        .then((result) => {
+          if (result.canceled) return;
+
+          const file = result.assets[0];
+          const fileName = file.name.toLowerCase();
+
+          // Validate file extension (this is the real gatekeeper)
+          if (!fileName.endsWith('.srt') && !fileName.endsWith('.vtt') && !fileName.endsWith('.ass')) {
+            Alert.alert('Invalid Format', 'Please select a .srt, .vtt, or .ass subtitle file');
+            return;
+          }
+
+          updateSubtitles(episodeId, file.uri)
+            .then(() => {
+              Alert.alert('Success', 'Subtitles added successfully!');
+            })
+            .catch((error) => {
+              Alert.alert('Error', 'Failed to add subtitles');
+              console.error(error);
+            });
+        })
+        .catch((error) => {
+          Alert.alert('Error', 'Failed to pick subtitle file');
+          console.error(error);
+        });
+    },
+    [updateSubtitles]
+  );
+
 
   const renderEpisodeCard = ({ item }: { item: typeof episodes[0] }) => (
     <TouchableOpacity style={styles.episodeCard}>
@@ -183,7 +219,7 @@ export default function LibraryScreen() {
       </View>
 
       <View style={styles.episodeActions}>
-        <TouchableOpacity 
+        <TouchableOpacity
           style={[styles.actionBtn, { backgroundColor: colors.primary + '20' }]}
           onPress={() => {
             console.log('Playing episode:', item.id);
@@ -196,10 +232,39 @@ export default function LibraryScreen() {
           <Feather name="play" size={16} color={colors.primary} />
           <Text style={[styles.actionBtnText, { color: colors.primary }]}>Watch</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={[styles.actionBtn, { backgroundColor: '#7FE5DE' + '20' }]}>
-          <Feather name="book-open" size={16} color="#7FE5DE" />
-          <Text style={[styles.actionBtnText, { color: '#7FE5DE' }]}>Review</Text>
-        </TouchableOpacity>
+        {item.subtitles && item.subtitles.length > 0 ? (
+          <TouchableOpacity
+       style={[styles.actionBtn, { backgroundColor: '#7FE5DE' + '20' }]}
+       onPress={() => {
+         Alert.alert(
+           'Subtitles',
+           `${item.subtitles.length} subtitles loaded`,
+           [
+             {
+               text: 'Change',
+               onPress: () => handleAddSubtitle(item.id),
+             },
+             {
+               text: 'Cancel',
+               onPress: () => {},
+               style: 'cancel',
+             },
+           ]
+         );
+       }}
+     >
+       <Feather name="check-circle" size={16} color="#7FE5DE" />
+       <Text style={[styles.actionBtnText, { color: '#7FE5DE' }]}>Subtitle</Text>
+     </TouchableOpacity>
+        ) : (
+          <TouchableOpacity
+            style={[styles.actionBtn, { backgroundColor: '#FFD700' + '20' }]}
+            onPress={() => handleAddSubtitle(item.id)}
+          >
+            <Feather name="plus-circle" size={16} color="#FFD700" />
+            <Text style={[styles.actionBtnText, { color: '#FFD700' }]}>Add</Text>
+          </TouchableOpacity>
+        )}
         <TouchableOpacity
           style={[styles.actionBtn, { backgroundColor: '#FF9999' + '20' }]}
           onPress={() => handleDelete(item.id)}
@@ -235,31 +300,6 @@ export default function LibraryScreen() {
             >
               {isLoading ? 'Uploading...' : 'Select Files'}
             </RetroButton>
-          </View>
-        </RetroWindow>
-
-        {/* Stats */}
-        <RetroWindow title="Your Library Stats" color="purple" style={styles.windowSection}>
-          <View style={styles.statsGrid}>
-            <View style={styles.statBox}>
-              <Feather name="film" size={24} color={colors.primary} />
-              <Text style={[styles.statNumber, { color: colors.primary }]}>{episodes.length}</Text>
-              <Text style={[styles.statLabel, { color: '#666666' }]}>Episodes</Text>
-            </View>
-            <View style={styles.statBox}>
-              <Feather name="check-circle" size={24} color="#A8E6CF" />
-              <Text style={[styles.statNumber, { color: '#A8E6CF' }]}>
-                {episodes.filter((e) => e.processingStatus === 'completed').length}
-              </Text>
-              <Text style={[styles.statLabel, { color: '#666666' }]}>Processed</Text>
-            </View>
-            <View style={styles.statBox}>
-              <Feather name="hard-drive" size={24} color="#FFD700" />
-              <Text style={[styles.statNumber, { color: '#FFD700' }]}>
-                {formatFileSize(episodes.reduce((sum, e) => sum + e.size, 0))}
-              </Text>
-              <Text style={[styles.statLabel, { color: '#666666' }]}>Storage</Text>
-            </View>
           </View>
         </RetroWindow>
 

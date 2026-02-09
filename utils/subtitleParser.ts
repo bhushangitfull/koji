@@ -12,7 +12,7 @@ export interface Subtitle {
 }
 
 export interface ParsedSubtitles {
-  format: 'srt' | 'vtt';
+  format: 'srt' | 'vtt' | 'ass';
   subtitles: Subtitle[];
   rawText: string;
 }
@@ -98,6 +98,94 @@ function parseSRT(content: string): Subtitle[] {
 }
 
 /**
+ * Parse ASS/SSA format subtitles
+ * Format (ASS/SSA):
+ * [Events]
+ * Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
+ * Dialogue: 0,0:00:05.00,0:00:10.00,Default,,0,0,0,,Japanese text here
+ * Time format: H:MM:SS.CC (centiseconds)
+ */
+function parseASS(content: string): Subtitle[] {
+  const subtitles: Subtitle[] = [];
+  const lines = content.split('\n');
+
+  let inEventsSection = false;
+  let subtitleIndex = 0;
+
+  // Find Events section and parse
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i].trim();
+
+    if (line === '[Events]') {
+      inEventsSection = true;
+      continue;
+    }
+
+    // Stop if we hit another section
+    if (line.startsWith('[') && line.endsWith(']') && inEventsSection) {
+      break;
+    }
+
+    // Parse Dialogue lines
+    if (inEventsSection && line.startsWith('Dialogue:')) {
+      try {
+        // Remove 'Dialogue: ' prefix
+        const dialogueData = line.substring(9);
+
+        // Split by comma, but be careful because Text field can contain commas
+        // Format: Layer,Start,End,Style,Name,MarginL,MarginR,MarginV,Effect,Text
+        const parts = dialogueData.split(',');
+
+        if (parts.length < 10) continue;
+
+        const startTimeStr = parts[1].trim();
+        const endTimeStr = parts[2].trim();
+        const text = parts.slice(9).join(',').trim(); // Text field is after Effect
+
+        // Remove ASS styling tags (like {\an8}, {\c&H...&})
+        const cleanText = text.replace(/\{[^}]*\}/g, '').trim();
+
+        if (!cleanText) continue;
+
+        // Convert ASS time format (H:MM:SS.CC) to milliseconds
+        const startMs = assTimeToMs(startTimeStr);
+        const endMs = assTimeToMs(endTimeStr);
+
+        subtitleIndex++;
+        subtitles.push({
+          index: subtitleIndex,
+          startTime: startMs,
+          endTime: endMs,
+          text: cleanText,
+          startTimeStr,
+          endTimeStr,
+        });
+      } catch (err) {
+        console.warn('Failed to parse ASS line:', line, err);
+      }
+    }
+  }
+
+  return subtitles;
+}
+
+/**
+ * Convert ASS time format "0:00:05.00" to milliseconds
+ */
+function assTimeToMs(timeStr: string): number {
+  const parts = timeStr.trim().split(':');
+  if (parts.length !== 3) return 0;
+
+  const hours = parseInt(parts[0], 10) || 0;
+  const minutes = parseInt(parts[1], 10) || 0;
+  const secondsAndCs = parts[2].split('.');
+  const seconds = parseInt(secondsAndCs[0], 10) || 0;
+  const centiseconds = parseInt((secondsAndCs[1] || '0').padEnd(2, '0'), 10) || 0;
+
+  return hours * 3600000 + minutes * 60000 + seconds * 1000 + centiseconds * 10;
+}
+
+/**
  * Parse VTT format subtitles
  * Format:
  * WEBVTT
@@ -155,8 +243,19 @@ function parseVTT(content: string): Subtitle[] {
  * Detect subtitle format and parse accordingly
  */
 export function parseSubtitles(content: string): ParsedSubtitles {
-  const format = content.includes('WEBVTT') ? 'vtt' : 'srt';
-  const subtitles = format === 'vtt' ? parseVTT(content) : parseSRT(content);
+  let format: 'srt' | 'vtt' | 'ass';
+  let subtitles: Subtitle[];
+
+  if (content.includes('[Events]')) {
+    format = 'ass';
+    subtitles = parseASS(content);
+  } else if (content.includes('WEBVTT')) {
+    format = 'vtt';
+    subtitles = parseVTT(content);
+  } else {
+    format = 'srt';
+    subtitles = parseSRT(content);
+  }
 
   return {
     format,

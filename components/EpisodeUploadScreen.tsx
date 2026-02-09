@@ -68,13 +68,21 @@ export const EpisodeUploadScreen: React.FC<EpisodeUploadScreenProps> = ({
   const pickSubtitleFile = async () => {
     try {
       const result = await DocumentPicker.getDocumentAsync({
-        type: ['text/plain', 'text/vtt', 'text/srt'],
+        type: ['*/*'],
         copyToCacheDirectory: true,
       });
 
       if (result.canceled) return;
 
       const file = result.assets[0];
+      
+      // Validate file extension
+      const fileName = file.name.toLowerCase();
+      if (!fileName.endsWith('.srt') && !fileName.endsWith('.vtt') && !fileName.endsWith('.ass')) {
+        Alert.alert('Invalid Format', 'Please select a .srt, .vtt, or .ass subtitle file');
+        return;
+      }
+
       setSubtitleFile({
         uri: file.uri,
         name: file.name,
@@ -233,7 +241,7 @@ export const EpisodeUploadScreen: React.FC<EpisodeUploadScreenProps> = ({
                   Tap to select subtitle file
                 </ThemedText>
                 <ThemedText style={styles.uploadButtonHint}>
-                  SRT, VTT, or other subtitle formats
+                  SRT, VTT, or ASS subtitle formats
                 </ThemedText>
               </TouchableOpacity>
             )}
