@@ -268,7 +268,14 @@ export function parseSubtitles(content: string): ParsedSubtitles {
  * Get subtitle at current timestamp
  */
 export function getSubtitleAtTime(subtitles: Subtitle[], timeMs: number): Subtitle | null {
-  return subtitles.find((sub) => timeMs >= sub.startTime && timeMs <= sub.endTime) || null;
+  if (!subtitles || !Array.isArray(subtitles)) return null;
+  
+  return subtitles.find((sub) => {
+    // Force conversion to numbers just in case storage turned them into strings
+    const start = Number(sub.startTime);
+    const end = Number(sub.endTime);
+    return timeMs >= start && timeMs <= end;
+  }) || null;
 }
 
 /**

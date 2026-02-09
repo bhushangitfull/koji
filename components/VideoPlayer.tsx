@@ -1,3 +1,4 @@
+// components/VideoPlayer.tsx - IMPROVED VERSION
 import { getSubtitleAtTime, Subtitle } from '@/utils/subtitleParser';
 import { Ionicons } from '@expo/vector-icons';
 import { useEvent, useEventListener } from 'expo';
@@ -26,7 +27,6 @@ export default function CustomPlayer({ videoUri, title, subtitles = [], onBack }
 
   const isDragging = useRef(false);
 
-
   // 1. Consolidated State
   const [isPlaying, setIsPlaying] = useState(false);
   const [duration, setDuration] = useState(0);
@@ -35,27 +35,58 @@ export default function CustomPlayer({ videoUri, title, subtitles = [], onBack }
   const [currentSubtitle, setCurrentSubtitle] = useState<Subtitle | null>(null);
   const [isLandscape, setIsLandscape] = useState(false);
 
-
   const player = useVideoPlayer(videoUri, (p) => {
     p.play();
   });
 
   const { status } = useEvent(player, 'statusChange', { status: player.status });
 
-  useEffect(() => {
-    if (status === 'readyToPlay' && player.duration > 0) {
-      setDuration(player.duration);
-    }
-  }, [status, player.duration]);
+useEffect(() => {
+  // Frequently, player.duration isn't ready at mount. 
+  // This watcher catches it when the video metadata loads.
+  if (player.duration > 0 && duration === 0) {
+    setDuration(player.duration);
+  }
+}, [player.duration, duration]);
 
-  // Debug: Log subtitles on mount and when they change
+  // CRITICAL DEBUG: Log subtitles on mount
   useEffect(() => {
-    console.log('VideoPlayer Mounted:', {
-      subtitleCount: subtitles.length,
+    console.log('===== VideoPlayer Subtitle Debug =====');
+    console.log('Subtitle count:', subtitles.length);
+    console.log('First 3 subtitles:', subtitles.slice(0, 3));
+    console.log('Subtitle data types:', {
+      hasSubtitles: subtitles.length > 0,
       firstSubtitle: subtitles[0],
-      subtitles: subtitles.slice(0, 3),
+      firstStartTime: subtitles[0]?.startTime,
+      firstStartTimeType: typeof subtitles[0]?.startTime,
+      firstText: subtitles[0]?.text,
     });
+    console.log('======================================');
   }, [subtitles]);
+
+  useEffect(() => {
+  let interval: NodeJS.Timeout;
+
+  if (isPlaying && !isDragging.current) {
+    // Manually poll the player's current time every 500ms
+    interval = setInterval(() => {
+      const time = player.currentTime;
+      setCurrentTime(time);
+
+      // Trigger Subtitle Match
+      if (subtitles.length > 0) {
+        const matched = getSubtitleAtTime(subtitles, time * 1000);
+        if (matched?.index !== currentSubtitle?.index) {
+          setCurrentSubtitle(matched);
+        }
+      }
+    }, 500);
+  }
+
+  return () => {
+    if (interval) clearInterval(interval);
+  };
+}, [isPlaying, player, subtitles, currentSubtitle]);
 
   // Handle screen orientation changes
   useEffect(() => {
@@ -67,22 +98,27 @@ export default function CustomPlayer({ videoUri, title, subtitles = [], onBack }
     return () => subscription?.remove();
   }, []);
 
-    useEffect(() => {
-     return () => {
-       ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP).catch(
-         error => console.error('Failed to reset orientation on unmount:', error)
-       );
-     };
-   }, []);
+  useEffect(() => {
+    return () => {
+      ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP).catch(
+        error => console.error('Failed to reset orientation on unmount:', error)
+      );
+    };
+  }, []);
+
+  useEffect(() => {
+  // If the player is already loaded but state is 0, sync it manually
+  if (player.duration > 0 && duration === 0) {
+    setDuration(player.duration);
+  }
+}, [player.duration]);
 
   const toggleRotation = async () => {
     try {
       if (isLandscape) {
-        // Return to portrait
         await ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP);
         setIsLandscape(false);
       } else {
-        // Go to landscape
         await ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.LANDSCAPE);
         setIsLandscape(true);
       }
@@ -92,9 +128,8 @@ export default function CustomPlayer({ videoUri, title, subtitles = [], onBack }
   };
 
   // 2. Listen for Metadata/Status changes
-  // This ensures duration updates as soon as the video loads
   useEventListener(player, 'statusChange', (event) => {
-    if (event.status === 'readyToPlay') {
+    if (event.status === 'readyToPlay' && player.duration > 0) {
       setDuration(player.duration);
     }
   });
@@ -103,30 +138,26 @@ export default function CustomPlayer({ videoUri, title, subtitles = [], onBack }
     setIsPlaying(event.isPlaying);
   });
 
-  useEventListener(player, 'timeUpdate', (event) => {
-    if (!isDragging.current) {
-      setCurrentTime(event.currentTime);
-      // Fallback: update duration if it was missed during statusChange
-      if (duration === 0 && player.duration > 0) {
-        setDuration(player.duration);
-      }
-      
-      // Update current subtitle based on timestamp (convert to milliseconds)
-      if (subtitles.length > 0) {
-        const timeMs = event.currentTime * 1000;
-        const subtitle = getSubtitleAtTime(subtitles, timeMs);
-        setCurrentSubtitle(subtitle);
-        
-        // Debug logging (remove in production)
-        if (subtitle && Math.random() < 0.1) { // Log 10% of updates to avoid spam
-          console.log('Subtitle Found:', {
-            currentTimeMs: timeMs,
-            subtitle: subtitle.text.substring(0, 50),
-          });
-        }
-      }
+
+
+useEventListener(player, 'timeUpdate', (event) => {
+  // If manual buttons work but playback doesn't, 
+  // we must ensure the state is actually being set here.
+  const newTime = event.currentTime;
+  
+  // Update the progress bar and time text
+  setCurrentTime(newTime);
+  
+  // Trigger subtitle logic
+  if (subtitles && subtitles.length > 0) {
+    const timeMs = newTime * 1000;
+    const subtitle = getSubtitleAtTime(subtitles, timeMs);
+    
+    if (subtitle?.index !== currentSubtitle?.index) {
+      setCurrentSubtitle(subtitle);
     }
-  });
+  }
+});
 
   const seekTo = (seconds) => {
     if (!player || duration <= 0) return;
@@ -141,8 +172,6 @@ export default function CustomPlayer({ videoUri, title, subtitles = [], onBack }
     }
   };
 
-
-
   const handleSkip = (amount) => {
     seekTo(player.currentTime + amount);
   };
@@ -156,15 +185,12 @@ export default function CustomPlayer({ videoUri, title, subtitles = [], onBack }
         isDragging.current = true;
       },
       onPanResponderMove: (evt, gestureState) => {
-        // Use moveX (absolute) and subtract the slider's start position
-        // For simplicity, if full-screen: (gestureState.moveX / barWidth)
         const percent = Math.max(0, Math.min(gestureState.moveX / (barWidth || 1), 1));
         setCurrentTime(percent * duration);
       },
       onPanResponderRelease: (evt, gestureState) => {
         const percent = Math.max(0, Math.min(gestureState.moveX / (barWidth || 1), 1));
         seekTo(percent * duration);
-        // Give the native player a moment to catch up before resuming timeUpdates
         setTimeout(() => { isDragging.current = false; }, 200);
       },
     })
@@ -176,9 +202,13 @@ export default function CustomPlayer({ videoUri, title, subtitles = [], onBack }
     const r = s % 60;
     return `${m}:${r.toString().padStart(2, '0')}`;
   };
+console.log('DRAG STATUS:', isDragging.current);
+console.log('TIME SYNC:', currentTime, '/', duration);
+
+
 
   return (
-    <View style={styles.container} >
+    <View style={styles.container}>
       <VideoView player={player} style={styles.video} nativeControls={false} surfaceType="textureView" />
 
       <View style={styles.overlay}>
@@ -187,16 +217,25 @@ export default function CustomPlayer({ videoUri, title, subtitles = [], onBack }
             <Ionicons name="arrow-back" size={28} color="white" />
           </TouchableOpacity>
           <Text style={styles.title}>{title}</Text>
-          <TouchableOpacity onPress={toggleRotation} style={styles.rotationBtn}>
-            <Ionicons name={isLandscape ? "contract" : "expand"} size={24} color="white" />
-          </TouchableOpacity>
         </View>
 
-        {/* Subtitle Display - Inside overlay, centered and above controls */}
+        {/* Subtitle Display - IMPROVED VISIBILITY */}
         {currentSubtitle && (
           <View style={styles.subtitleWrapper}>
             <View style={styles.subtitleContainer}>
-              <Text style={styles.subtitleText}>{currentSubtitle.text}</Text>
+              <Text style={styles.subtitleText}>
+                {currentSubtitle.text}
+              </Text>
+            </View>
+          </View>
+        )}
+
+
+        {/* Debug indicator when no subtitles are available */}
+        {subtitles.length === 0 && (
+          <View style={styles.subtitleWrapper}>
+            <View style={[styles.subtitleContainer, { backgroundColor: 'rgba(255, 0, 0, 0.5)' }]}>
+              <Text style={styles.subtitleText}>No subtitles loaded</Text>
             </View>
           </View>
         )}
@@ -227,8 +266,18 @@ export default function CustomPlayer({ videoUri, title, subtitles = [], onBack }
             onLayout={(e) => setBarWidth(e.nativeEvent.layout.width)}
           >
             <View style={styles.track}>
-              <View style={[styles.fill, { width: `${(currentTime / (duration || 1)) * 100}%` }]} />
-              <View style={[styles.knob, { left: `${(currentTime / (duration || 1)) * 100}%` }]} />
+              <View
+                style={[
+                  styles.fill,
+                  { width: duration > 0 ? `${(currentTime / duration) * 100}%` : '0%' }
+                ]}
+              />
+              <View
+                style={[
+                  styles.knob,
+                  { left: duration > 0 ? `${(currentTime / duration) * 100}%` : '0%' }
+                ]}
+              />
             </View>
           </View>
 
@@ -245,45 +294,101 @@ export default function CustomPlayer({ videoUri, title, subtitles = [], onBack }
   );
 }
 
-
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#000' },
   video: { flex: 1 },
-  overlay: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.3)', justifyContent: 'space-between', paddingVertical: 0 },
-  topBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingTop: 50, paddingHorizontal: 20 },
-  title: { color: 'white', fontSize: 18, fontWeight: 'bold', flex: 1, marginHorizontal: 12 },
+  overlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.3)',
+    justifyContent: 'space-between',
+    paddingVertical: 0
+  },
+  topBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingTop: 50,
+    paddingHorizontal: 20
+  },
+  title: {
+    color: 'white',
+    fontSize: 18,
+    fontWeight: 'bold',
+    flex: 1,
+    marginHorizontal: 12
+  },
   rotationBtn: { padding: 8 },
   bottomBar: { paddingHorizontal: 20, paddingBottom: 20 },
   controlsContainer: { marginBottom: 12 },
-  centerRow: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 16 },
-  smallPlayBtn: { width: 56, height: 56, borderRadius: 28, backgroundColor: 'rgba(255,255,255,0.2)', justifyContent: 'center', alignItems: 'center' },
-  smallBtn: { padding: 8 },
-  sliderWrapper: { height: 40, justifyContent: 'center', marginVertical: 8 },
-  track: { height: 4, backgroundColor: 'rgba(255,255,255,0.3)', borderRadius: 2, position: 'relative' },
-  fill: { height: '100%', backgroundColor: '#FFB6D9', borderRadius: 2 },
-  knob: { position: 'absolute', width: 16, height: 16, borderRadius: 8, backgroundColor: '#FFB6D9', top: -6, marginLeft: -8 },
-  timeRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 8 },
-  time: { color: 'white', fontSize: 12 },
-  fullscreenBtn: { padding: 8, alignItems: 'center', justifyContent: 'center' },
-  subtitleWrapper: {
-    flex: 1,
+  centerRow: {
+    flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
-    pointerEvents: 'none',
+    gap: 16
+  },
+  smallPlayBtn: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    justifyContent: 'center',
+    alignItems: 'center'
+  },
+  smallBtn: { padding: 8 },
+  sliderWrapper: { height: 40, justifyContent: 'center', marginVertical: 8 },
+  track: {
+    height: 4,
+    backgroundColor: 'rgba(255,255,255,0.3)',
+    borderRadius: 2,
+    position: 'relative'
+  },
+  fill: {
+    height: '100%',
+    backgroundColor: '#FFB6D9',
+    borderRadius: 2
+  },
+  knob: {
+    position: 'absolute',
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    backgroundColor: '#FFB6D9',
+    top: -6,
+    marginLeft: -8
+  },
+  timeRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: 8
+  },
+  time: { color: 'white', fontSize: 12 },
+  fullscreenBtn: {
+    padding: 8,
+    alignItems: 'center',
+    justifyContent: 'center'
+  },
+  subtitleWrapper: {
+    position: 'absolute',
+    bottom: 100, // Explicitly push it up from the bottom
+    left: 0,
+    right: 0,
+    alignItems: 'center',
+    zIndex: 10,// Move subtitles up above controls
   },
   subtitleContainer: {
     alignItems: 'center',
     paddingHorizontal: 16,
+    maxWidth: '90%',
   },
   subtitleText: {
     color: 'white',
-    fontSize: 16,
-    fontWeight: '500',
+    fontSize: 18,
+    backgroundColor: 'rgba(0,0,0,0.6)', // Black box behind text
+    paddingHorizontal: 8,
     textAlign: 'center',
-    backgroundColor: 'rgba(0, 0, 0, 0.8)',
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    borderRadius: 6,
-    maxWidth: '90%',
+    textShadowColor: 'black',
+    textShadowOffset: { width: 1, height: 1 },
+    textShadowRadius: 1,
   },
 });

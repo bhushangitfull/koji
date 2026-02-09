@@ -1,11 +1,11 @@
-// app/player.tsx
+// app/player.tsx - FIXED VERSION
 import VideoPlayer from '@/components/VideoPlayer';
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useEpisodeUpload } from '@/hooks/useEpisodeUpload';
 import { Feather } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import React from 'react';
+import React, { useMemo } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 export default function PlayerScreen() {
@@ -20,6 +20,22 @@ export default function PlayerScreen() {
   const handleBack = () => {
     router.back();
   };
+
+  // Parse and validate subtitles - THIS IS THE KEY FIX
+const subtitles = useMemo(() => {
+  if (!episode?.subtitles || episode.subtitles.length === 0) {
+    console.log('Player: No subtitles available yet.');
+    return [];
+  }
+  return episode.subtitles;
+}, [episode?.subtitles]);
+
+  console.log('Processed subtitles for player:', {
+    count: subtitles.length,
+    firstThree: subtitles.slice(0, 3),
+    firstSubtitleTime: subtitles[0]?.startTime,
+    lastSubtitleTime: subtitles[subtitles.length - 1]?.endTime,
+  });
 
   if (!episode) {
     return (
@@ -45,24 +61,6 @@ export default function PlayerScreen() {
       </View>
     );
   }
-
-  // Parse subtitles if available
-  const subtitles = episode.subtitles?.map(sub => ({
-    index: sub.index,
-    startTime: sub.startTime || 0,
-    endTime: sub.endTime || 0,
-    text: sub.text || '',
-    startTimeStr: sub.startTimeStr || '',
-    endTimeStr: sub.endTimeStr || '',
-  })) || [];
-
-  console.log('Player Screen Debug:', {
-    episodeId,
-    episodeTitle: episode.title,
-    hasSubtitles: episode.subtitles && episode.subtitles.length > 0,
-    subtitleCount: episode.subtitles?.length || 0,
-    subtitles: subtitles.slice(0, 3), // First 3 for debugging
-  });
 
   return (
     <View style={styles.container}>

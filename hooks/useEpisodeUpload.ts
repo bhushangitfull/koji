@@ -1,13 +1,12 @@
-import { useCallback, useState, useEffect } from 'react';
-import * as FileSystem from 'expo-file-system/legacy';
-import { parseSubtitles, Subtitle } from '@/utils/subtitleParser';
-import {
-  readSubtitleFile,
-  saveFileToEpisode,
-  createEpisodeDirectory,
-  formatFileSize,
-} from '@/utils/fileSystem';
 import { LocalEpisode } from '@/types/index';
+import {
+  createEpisodeDirectory,
+  readSubtitleFile,
+  saveFileToEpisode
+} from '@/utils/fileSystem';
+import { parseSubtitles, Subtitle } from '@/utils/subtitleParser';
+import * as FileSystem from 'expo-file-system/legacy';
+import { useCallback, useEffect, useState } from 'react';
 
 export type { LocalEpisode as EpisodeData };
 
@@ -18,11 +17,7 @@ export const useEpisodeUpload = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Load episodes from storage on mount
-  useEffect(() => {
-    loadEpisodes();
-  }, []);
-
+  // 1. Centralized loading logic to ensure data is fresh
   const loadEpisodes = useCallback(async () => {
     try {
       const info = await FileSystem.getInfoAsync(EPISODES_METADATA_FILE);
@@ -31,24 +26,31 @@ export const useEpisodeUpload = () => {
           encoding: FileSystem.EncodingType.UTF8,
         });
         const loadedEpisodes = JSON.parse(content) as EpisodeData[];
-        console.log('Loaded episodes from storage:', loadedEpisodes.length);
         setEpisodes(loadedEpisodes);
+        return loadedEpisodes;
       }
+      return [];
     } catch (err) {
       console.error('Error loading episodes:', err);
+      return [];
     }
   }, []);
 
-  const saveEpisodes = useCallback(async (episodesToSave: EpisodeData[]) => {
+  useEffect(() => {
+    loadEpisodes();
+  }, [loadEpisodes]);
+
+  // 2. Pure persistence logic (does not touch state directly)
+  const saveToDisk = useCallback(async (episodesToSave: EpisodeData[]) => {
     try {
       await FileSystem.writeAsStringAsync(
         EPISODES_METADATA_FILE,
         JSON.stringify(episodesToSave, null, 2),
         { encoding: FileSystem.EncodingType.UTF8 }
       );
-      console.log('Saved episodes to storage:', episodesToSave.length);
     } catch (err) {
-      console.error('Error saving episodes:', err);
+      console.error('Error saving episodes to disk:', err);
+      throw err;
     }
   }, []);
 
@@ -66,47 +68,32 @@ export const useEpisodeUpload = () => {
         const episodeId = `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
         onProgress?.(10);
 
-        // Create episode directory
         await createEpisodeDirectory(episodeId);
         onProgress?.(20);
 
-        // Get video file info
         const videoInfo = await FileSystem.getInfoAsync(videoUri);
         const videoSize = videoInfo.size || 0;
 
-        // Extract video filename and save
         const videoFileName = videoUri.split('/').pop() || `video.mp4`;
         const savedVideoUri = await saveFileToEpisode(episodeId, videoUri, videoFileName);
         onProgress?.(50);
 
-        // Handle subtitles if provided
         let savedSubtitleUri: string | undefined;
         let parsedSubtitles: Subtitle[] = [];
 
         if (subtitleUri) {
           try {
             const subtitleFileName = subtitleUri.split('/').pop() || `subtitles.srt`;
-            savedSubtitleUri = await saveFileToEpisode(
-              episodeId,
-              subtitleUri,
-              subtitleFileName
-            );
-            onProgress?.(70);
-
-            // Parse subtitles
+            savedSubtitleUri = await saveFileToEpisode(episodeId, subtitleUri, subtitleFileName);
             const subtitleContent = await readSubtitleFile(savedSubtitleUri);
             const parsed = parseSubtitles(subtitleContent);
             parsedSubtitles = parsed.subtitles;
-            onProgress?.(85);
           } catch (subtitleError) {
-            console.warn('Failed to parse subtitles:', subtitleError);
-            // Continue without subtitles
+            console.warn('Subtitle processing failed:', subtitleError);
           }
         }
 
-        onProgress?.(95);
-
-        const episodeData: LocalEpisode = {
+        const newEpisode: LocalEpisode = {
           id: episodeId,
           title,
           videoUri: savedVideoUri,
@@ -117,62 +104,24 @@ export const useEpisodeUpload = () => {
           processingStatus: 'completed',
         };
 
-        setEpisodes((prev) => {
-          const updated = [episodeData, ...prev];
-          saveEpisodes(updated); // Save to storage
-          return updated;
-        });
-        onProgress?.(100);
+        // Update sequence: Get current disk state, add new, save, then update UI state
+        const currentEpisodes = await loadEpisodes();
+        const updated = [newEpisode, ...currentEpisodes];
+        await saveToDisk(updated);
+        setEpisodes(updated);
 
-        return episodeData;
+        onProgress?.(100);
+        return newEpisode;
       } catch (err) {
-        const errorMessage = err instanceof Error ? err.message : 'Unknown error';
+        const errorMessage = err instanceof Error ? err.message : 'Upload failed';
         setError(errorMessage);
         throw err;
       } finally {
         setIsLoading(false);
       }
     },
-    [saveEpisodes]
+    [loadEpisodes, saveToDisk]
   );
-
-  const deleteEpisode = useCallback(async (episodeId: string) => {
-    try {
-      const episodePath = `${FileSystem.documentDirectory}koji/episodes/${episodeId}/`;
-      await FileSystem.deleteAsync(episodePath, { idempotent: true });
-
-      setEpisodes((prev) => {
-        const updated = prev.filter((ep) => ep.id !== episodeId);
-        saveEpisodes(updated); // Save to storage
-        return updated;
-      });
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Unknown error';
-      setError(errorMessage);
-      throw err;
-    }
-  }, [saveEpisodes]);
-
-  const getEpisode = useCallback((episodeId: string): EpisodeData | null => {
-    return episodes.find((ep) => ep.id === episodeId) || null;
-  }, [episodes]);
-
-  const loadLocalEpisodes = useCallback(async () => {
-    try {
-      const episodesDir = `${FileSystem.documentDirectory}koji/episodes/`;
-      const info = await FileSystem.getInfoAsync(episodesDir);
-
-      if (!info.exists) {
-        return;
-      }
-
-      // Note: expo-file-system doesn't have a readdir function in all versions
-      // For now, we'll rely on state management from uploads
-      // In production, you might want to scan the directory and rebuild state
-    } catch (err) {
-      console.warn('Failed to load local episodes:', err);
-    }
-  }, []);
 
   const updateSubtitles = useCallback(
     async (episodeId: string, subtitleUri: string): Promise<void> => {
@@ -180,45 +129,52 @@ export const useEpisodeUpload = () => {
         setIsLoading(true);
         setError(null);
 
-        const episode = episodes.find((ep) => ep.id === episodeId);
-        if (!episode) throw new Error('Episode not found');
+        // Fetch the freshest data from disk before modifying
+        const currentEpisodes = await loadEpisodes();
+        const episodeIndex = currentEpisodes.findIndex((ep) => ep.id === episodeId);
+        
+        if (episodeIndex === -1) throw new Error('Episode not found');
 
-        // Save subtitle file to episode directory
         const subtitleFileName = subtitleUri.split('/').pop() || `subtitles.srt`;
-        const savedSubtitleUri = await saveFileToEpisode(
-          episodeId,
-          subtitleUri,
-          subtitleFileName
-        );
-
-        // Parse subtitles
+        const savedSubtitleUri = await saveFileToEpisode(episodeId, subtitleUri, subtitleFileName);
         const subtitleContent = await readSubtitleFile(savedSubtitleUri);
         const parsed = parseSubtitles(subtitleContent);
 
-        // Update episode with new subtitles
-        setEpisodes((prev) => {
-          const updated = prev.map((ep) =>
-            ep.id === episodeId
-              ? {
-                  ...ep,
-                  subtitleUri: savedSubtitleUri,
-                  subtitles: parsed.subtitles,
-                }
-              : ep
-          );
-          saveEpisodes(updated);
-          return updated;
-        });
+        const updatedEpisodes = [...currentEpisodes];
+        updatedEpisodes[episodeIndex] = {
+          ...updatedEpisodes[episodeIndex],
+          subtitleUri: savedSubtitleUri,
+          subtitles: parsed.subtitles,
+        };
+
+        // Save and then update state
+        await saveToDisk(updatedEpisodes);
+        setEpisodes(updatedEpisodes);
       } catch (err) {
-        const errorMessage = err instanceof Error ? err.message : 'Unknown error';
-        setError(errorMessage);
+        setError(err instanceof Error ? err.message : 'Subtitle update failed');
         throw err;
       } finally {
         setIsLoading(false);
       }
     },
-    [episodes, saveEpisodes]
+    [loadEpisodes, saveToDisk]
   );
+
+  const deleteEpisode = useCallback(async (episodeId: string) => {
+    try {
+      const episodePath = `${FileSystem.documentDirectory}koji/episodes/${episodeId}/`;
+      await FileSystem.deleteAsync(episodePath, { idempotent: true });
+
+      const currentEpisodes = await loadEpisodes();
+      const updated = currentEpisodes.filter((ep) => ep.id !== episodeId);
+      
+      await saveToDisk(updated);
+      setEpisodes(updated);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Delete failed');
+      throw err;
+    }
+  }, [loadEpisodes, saveToDisk]);
 
   return {
     episodes,
@@ -226,8 +182,7 @@ export const useEpisodeUpload = () => {
     error,
     uploadEpisode,
     deleteEpisode,
-    getEpisode,
-    loadLocalEpisodes,
     updateSubtitles,
+    refreshEpisodes: loadEpisodes,
   };
 };
