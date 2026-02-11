@@ -4,6 +4,8 @@
  */
 
 import { supabase } from '@/utils/supabase';
+import * as Crypto from 'expo-crypto';
+
 
 // Jisho API Types
 export interface JishoDefinition {
@@ -258,11 +260,12 @@ export async function createFlashcard(
   definition: any
 ): Promise<string | null> {
   try {
+    console.log('Creating flashcard with episodeId:', episodeId);
     const { data, error } = await supabase
       .from('flashcards')
       .insert({
         episode_id: episodeId,
-        vocab_id: crypto.getRandomUUID?.() || `vocab_${Date.now()}`,
+        vocab_id: Crypto.randomUUID(),
         japanese_text: word,
         english_translation: definition.meaning,
         furigana: definition.furigana,

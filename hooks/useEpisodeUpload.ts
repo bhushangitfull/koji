@@ -5,8 +5,12 @@ import {
   saveFileToEpisode
 } from '@/utils/fileSystem';
 import { parseSubtitles, Subtitle } from '@/utils/subtitleParser';
+import * as Crypto from 'expo-crypto';
 import * as FileSystem from 'expo-file-system/legacy';
 import { useCallback, useEffect, useState } from 'react';
+
+
+
 
 export type { LocalEpisode as EpisodeData };
 
@@ -65,7 +69,10 @@ export const useEpisodeUpload = () => {
         setIsLoading(true);
         setError(null);
 
-        const episodeId = `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+        const episodeId = Crypto.randomUUID();
+
+
+
         onProgress?.(10);
 
         await createEpisodeDirectory(episodeId);

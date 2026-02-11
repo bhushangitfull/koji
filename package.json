@@ -19,8 +19,9 @@
     "@supabase/supabase-js": "^2.94.0",
     "cors": "^2.8.6",
     "expo": "~54.0.32",
-    "expo-av": "~16.0.8",
+    "expo-av": "^16.0.8",
     "expo-constants": "~18.0.13",
+    "expo-crypto": "~15.0.8",
     "expo-document-picker": "^14.0.8",
     "expo-file-system": "^19.0.21",
     "expo-font": "~14.0.11",
@@ -49,10 +50,12 @@
     "react-native-video": "^6.19.0",
     "react-native-video-player": "^0.16.3",
     "react-native-web": "~0.21.0",
-    "react-native-worklets": "0.5.1"
+    "react-native-worklets": "0.5.1",
+    "uuid": "^13.0.0"
   },
   "devDependencies": {
     "@types/react": "~19.1.0",
+    "@types/uuid": "^10.0.0",
     "eslint": "^9.25.0",
     "eslint-config-expo": "~10.0.0",
     "typescript": "~5.9.2"
