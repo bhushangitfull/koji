@@ -11,8 +11,11 @@ import {
   StyleSheet,
   Text,
   TouchableOpacity,
-  View
+  View,
+  Pressable,
 } from 'react-native';
+import WordDefinitionModal, { WordDefinition } from './WordDefinitionModal';
+import { getFromDictionary } from '@/utils/flashcardGenerator';
 
 const { width: windowWidth } = Dimensions.get('window');
 
@@ -26,6 +29,9 @@ interface CustomPlayerProps {
 export default function CustomPlayer({ videoUri, title, subtitles = [], onBack }: CustomPlayerProps) {
 
   const isDragging = useRef(false);
+  const [selectedWord, setSelectedWord] = useState<string | null>(null);
+  const [selectedDefinition, setSelectedDefinition] = useState<WordDefinition | null>(null);
+  const [definitionModalVisible, setDefinitionModalVisible] = useState(false);
 
   // DEBUG: Log first subtitle text before render
   useEffect(() => {
@@ -222,6 +228,21 @@ useEventListener(player, 'timeUpdate', (event) => {
     const r = s % 60;
     return `${m}:${r.toString().padStart(2, '0')}`;
   };
+
+  const handleWordPress = (word: string) => {
+    setSelectedWord(word);
+    const definition = getFromDictionary(word);
+    setSelectedDefinition(definition);
+    setDefinitionModalVisible(true);
+  };
+
+  const handleCloseDefinition = () => {
+    setDefinitionModalVisible(false);
+    setTimeout(() => {
+      setSelectedWord(null);
+      setSelectedDefinition(null);
+    }, 300);
+  };
   return (
     <View style={styles.container}>
       <VideoView 
@@ -247,18 +268,32 @@ useEventListener(player, 'timeUpdate', (event) => {
           </TouchableOpacity>
         </View>
 
-        {/* FIXED: Subtitle Display - Positioned higher, smaller text */}
+        {/* FIXED: Subtitle Display - Positioned higher, smaller text, tappable */}
         {currentSubtitle ? (
-          <View style={styles.subtitleWrapper}>
+          <Pressable 
+            style={styles.subtitleWrapper}
+            onPress={() => {}}
+          >
             <View style={styles.subtitleContainer}>
               <Text 
                 style={styles.subtitleText}
                 numberOfLines={0}
               >
-                {currentSubtitle.text}
+                {currentSubtitle.text.split(/(\s+)/).map((word, index) => 
+                  word.trim() ? (
+                    <Pressable 
+                      key={index}
+                      onPress={() => handleWordPress(word.trim())}
+                    >
+                      <Text style={styles.subtitleWord}>{word}</Text>
+                    </Pressable>
+                  ) : (
+                    <Text key={index}>{word}</Text>
+                  )
+                )}
               </Text>
             </View>
-          </View>
+          </Pressable>
         ) : (
           // Debug indicator when no subtitle is active
           subtitles.length > 0 && __DEV__ && (
@@ -324,6 +359,13 @@ useEventListener(player, 'timeUpdate', (event) => {
           </View>
         </View>
       </View>
+
+      <WordDefinitionModal
+        visible={definitionModalVisible}
+        word={selectedWord}
+        definition={selectedDefinition}
+        onClose={handleCloseDefinition}
+      />
     </View>
   );
 }
@@ -367,7 +409,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     zIndex: 100,
-    pointerEvents: 'none',
+    pointerEvents: 'auto',
     paddingHorizontal: 20,
   },
   subtitleContainer: {
@@ -387,6 +429,12 @@ const styles = StyleSheet.create({
     textShadowColor: '#000000',
     textShadowOffset: { width: 1, height: 1 },
     textShadowRadius: 2,
+  },
+  subtitleWord: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '600',
+    paddingHorizontal: 2,
   },
   
   // FIXED: Bottom controls - compact and organized

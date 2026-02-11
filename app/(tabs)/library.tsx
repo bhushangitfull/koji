@@ -7,10 +7,10 @@ import { useFlashcardGeneration } from '@/hooks/useFlashcardGeneration';
 import { formatFileSize, initializeAppDirectories } from '@/utils/fileSystem';
 import { Feather, MaterialIcons } from '@expo/vector-icons';
 import * as DocumentPicker from 'expo-document-picker';
-import * as FileSystem from 'expo-file-system';
+import * as FileSystem from 'expo-file-system/legacy';
 import { useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
-import { Alert, FlatList, Modal, ScrollView, StyleSheet, Text, TouchableOpacity, View, ActivityIndicator, ProgressBarAndroid } from 'react-native';
+import { ActivityIndicator, Alert, FlatList, Modal, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 const getStatusColor = (status: string) => {
@@ -231,6 +231,7 @@ export default function LibraryScreen() {
     },
     [episodes, generation, router]
   );
+  const renderEpisodeCard = ({ item }: { item: any }) => (
   <TouchableOpacity style={styles.episodeCard}>
     <View style={styles.episodeHeader}>
       <View style={styles.episodeTitleContainer}>
@@ -341,7 +342,8 @@ export default function LibraryScreen() {
       </TouchableOpacity>
     </View>
   </TouchableOpacity>
-  );
+);
+  
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.retroBg }]}>
