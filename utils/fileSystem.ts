@@ -133,13 +133,28 @@ export async function saveFileToEpisode(
 }
 
 /**
- * Read subtitle file content
+ * Read subtitle file content with fallback encoding
  */
 export async function readSubtitleFile(fileUri: string): Promise<string> {
   try {
-    const content = await FileSystem.readAsStringAsync(fileUri, {
-      encoding: FileSystem.EncodingType.UTF8,
-    });
+    let content: string;
+    
+    try {
+      // First try UTF-8
+      content = await FileSystem.readAsStringAsync(fileUri, {
+        encoding: FileSystem.EncodingType.UTF8,
+      });
+    } catch (utf8Error) {
+      // Fallback: try reading as binary and attempt to decode
+      console.warn('UTF-8 read failed, attempting binary read:', utf8Error);
+      content = await FileSystem.readAsStringAsync(fileUri);
+    }
+    
+    // Log diagnostic info for Japanese subtitles
+    if (content.includes('0x')) {
+      console.warn('Possible encoding issue detected in subtitle file');
+    }
+    
     return content;
   } catch (error) {
     console.error('Error reading subtitle file:', error);

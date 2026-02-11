@@ -80,7 +80,14 @@ function parseSRT(content: string): Subtitle[] {
     const startTimeFormatted = startTimeStr.replace(',', '.');
     const endTimeFormatted = endTimeStr.replace(',', '.');
 
-    const text = lines.slice(timingLineIndex + 1).join('\n').trim();
+    // Get text content and preserve it without aggressive trimming
+    const textLines = lines.slice(timingLineIndex + 1);
+    const text = textLines.join('\n').trim();
+
+    // Log if Japanese characters detected for debugging
+    if (text && /[\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FFF]/.test(text)) {
+      console.log(`[SRT] Japanese subtitle detected at index ${blockIndex + 1}: ${text.substring(0, 50)}`);
+    }
 
     if (text) {
       subtitles.push({
@@ -94,6 +101,7 @@ function parseSRT(content: string): Subtitle[] {
     }
   });
 
+  console.log(`[SRT Parser] Parsed ${subtitles.length} subtitles total`);
   return subtitles;
 }
 
@@ -147,6 +155,11 @@ function parseASS(content: string): Subtitle[] {
 
         if (!cleanText) continue;
 
+        // Log if Japanese characters detected for debugging
+        if (/[\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FFF]/.test(cleanText)) {
+          console.log(`[ASS] Japanese subtitle detected at index ${subtitleIndex + 1}: ${cleanText.substring(0, 50)}`);
+        }
+
         // Convert ASS time format (H:MM:SS.CC) to milliseconds
         const startMs = assTimeToMs(startTimeStr);
         const endMs = assTimeToMs(endTimeStr);
@@ -166,6 +179,7 @@ function parseASS(content: string): Subtitle[] {
     }
   }
 
+  console.log(`[ASS Parser] Parsed ${subtitles.length} subtitles total`);
   return subtitles;
 }
 
@@ -221,12 +235,19 @@ function parseVTT(content: string): Subtitle[] {
       }
 
       if (text.length > 0) {
+        const fullText = text.join('\n');
+        
+        // Log if Japanese characters detected for debugging
+        if (/[\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FFF]/.test(fullText)) {
+          console.log(`[VTT] Japanese subtitle detected at index ${subtitleIndex + 1}: ${fullText.substring(0, 50)}`);
+        }
+        
         subtitleIndex++;
         subtitles.push({
           index: subtitleIndex,
           startTime: timeStringToMs(startTimeStr),
           endTime: timeStringToMs(endTimeStr),
-          text: text.join('\n'),
+          text: fullText,
           startTimeStr,
           endTimeStr,
         });
@@ -236,6 +257,7 @@ function parseVTT(content: string): Subtitle[] {
     }
   }
 
+  console.log(`[VTT Parser] Parsed ${subtitles.length} subtitles total`);
   return subtitles;
 }
 
@@ -243,20 +265,27 @@ function parseVTT(content: string): Subtitle[] {
  * Detect subtitle format and parse accordingly
  */
 export function parseSubtitles(content: string): ParsedSubtitles {
+  console.log('[parseSubtitles] Input content length:', content.length);
+  console.log('[parseSubtitles] First 200 chars:', content.substring(0, 200));
+  
   let format: 'srt' | 'vtt' | 'ass';
   let subtitles: Subtitle[];
 
   if (content.includes('[Events]')) {
     format = 'ass';
+    console.log('[parseSubtitles] Detected ASS format');
     subtitles = parseASS(content);
   } else if (content.includes('WEBVTT')) {
     format = 'vtt';
+    console.log('[parseSubtitles] Detected VTT format');
     subtitles = parseVTT(content);
   } else {
     format = 'srt';
+    console.log('[parseSubtitles] Detected SRT format');
     subtitles = parseSRT(content);
   }
 
+  console.log(`[parseSubtitles] Returning ${subtitles.length} subtitles in ${format} format`);
   return {
     format,
     subtitles,

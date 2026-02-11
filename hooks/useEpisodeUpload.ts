@@ -85,8 +85,21 @@ export const useEpisodeUpload = () => {
           try {
             const subtitleFileName = subtitleUri.split('/').pop() || `subtitles.srt`;
             savedSubtitleUri = await saveFileToEpisode(episodeId, subtitleUri, subtitleFileName);
+            console.log('[uploadEpisode] Saved subtitle to:', savedSubtitleUri);
+            
             const subtitleContent = await readSubtitleFile(savedSubtitleUri);
+            console.log('[uploadEpisode] Read subtitle content:', {
+              length: subtitleContent.length,
+              preview: subtitleContent.substring(0, 200),
+            });
+            
             const parsed = parseSubtitles(subtitleContent);
+            console.log('[uploadEpisode] Parsed subtitles:', {
+              format: parsed.format,
+              count: parsed.subtitles.length,
+              samples: parsed.subtitles.slice(0, 2),
+            });
+            
             parsedSubtitles = parsed.subtitles;
           } catch (subtitleError) {
             console.warn('Subtitle processing failed:', subtitleError);
@@ -137,8 +150,21 @@ export const useEpisodeUpload = () => {
 
         const subtitleFileName = subtitleUri.split('/').pop() || `subtitles.srt`;
         const savedSubtitleUri = await saveFileToEpisode(episodeId, subtitleUri, subtitleFileName);
+        
+        console.log('[updateSubtitles] Saved subtitle to:', savedSubtitleUri);
+        
         const subtitleContent = await readSubtitleFile(savedSubtitleUri);
+        console.log('[updateSubtitles] Read subtitle content:', {
+          length: subtitleContent.length,
+          preview: subtitleContent.substring(0, 200),
+        });
+        
         const parsed = parseSubtitles(subtitleContent);
+        console.log('[updateSubtitles] Parsed subtitles:', {
+          format: parsed.format,
+          count: parsed.subtitles.length,
+          samples: parsed.subtitles.slice(0, 2),
+        });
 
         const updatedEpisodes = [...currentEpisodes];
         updatedEpisodes[episodeIndex] = {

@@ -64,6 +64,17 @@ useEffect(() => {
     console.log('======================================');
   }, [subtitles]);
 
+  // Debug subtitle matching on changes
+  useEffect(() => {
+    console.log('[Subtitle Match] Current subtitle:', {
+      matched: currentSubtitle?.text?.substring(0, 50),
+      index: currentSubtitle?.index,
+      startTime: currentSubtitle?.startTime,
+      endTime: currentSubtitle?.endTime,
+      playerTime: currentTime,
+    });
+  }, [currentSubtitle, currentTime]);
+
   useEffect(() => {
   let interval: NodeJS.Timeout;
 
@@ -202,8 +213,8 @@ useEventListener(player, 'timeUpdate', (event) => {
     const r = s % 60;
     return `${m}:${r.toString().padStart(2, '0')}`;
   };
-console.log('DRAG STATUS:', isDragging.current);
-console.log('TIME SYNC:', currentTime, '/', duration);
+// console.log('DRAG STATUS:', isDragging.current);
+// console.log('TIME SYNC:', currentTime, '/', duration);
 
 
 
@@ -223,7 +234,10 @@ console.log('TIME SYNC:', currentTime, '/', duration);
         {currentSubtitle && (
           <View style={styles.subtitleWrapper}>
             <View style={styles.subtitleContainer}>
-              <Text style={styles.subtitleText}>
+              <Text 
+                style={styles.subtitleText}
+                numberOfLines={0}
+              >
                 {currentSubtitle.text}
               </Text>
             </View>
@@ -234,8 +248,8 @@ console.log('TIME SYNC:', currentTime, '/', duration);
         {/* Debug indicator when no subtitles are available */}
         {subtitles.length === 0 && (
           <View style={styles.subtitleWrapper}>
-            <View style={[styles.subtitleContainer, { backgroundColor: 'rgba(255, 0, 0, 0.5)' }]}>
-              <Text style={styles.subtitleText}>No subtitles loaded</Text>
+            <View style={[styles.subtitleContainer, { backgroundColor: 'rgba(255, 0, 0, 0.8)' }]}>
+              <Text style={styles.subtitleText}>⚠️ No subtitles loaded</Text>
             </View>
           </View>
         )}
@@ -370,25 +384,34 @@ const styles = StyleSheet.create({
   },
   subtitleWrapper: {
     position: 'absolute',
-    bottom: 100, // Explicitly push it up from the bottom
+    bottom: 120,
     left: 0,
     right: 0,
     alignItems: 'center',
-    zIndex: 10,// Move subtitles up above controls
+    justifyContent: 'center',
+    zIndex: 100,
+    pointerEvents: 'none',
+    paddingHorizontal: 12,
   },
   subtitleContainer: {
     alignItems: 'center',
+    justifyContent: 'center',
     paddingHorizontal: 16,
-    maxWidth: '90%',
+    paddingVertical: 12,
+    maxWidth: '95%',
   },
   subtitleText: {
     color: 'white',
     fontSize: 18,
-    backgroundColor: 'rgba(0,0,0,0.6)', // Black box behind text
-    paddingHorizontal: 8,
+    fontWeight: '500',
+    backgroundColor: 'rgba(0,0,0,0.85)',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 4,
     textAlign: 'center',
-    textShadowColor: 'black',
-    textShadowOffset: { width: 1, height: 1 },
-    textShadowRadius: 1,
+    textShadowColor: '#000000',
+    textShadowOffset: { width: 0, height: 0 },
+    textShadowRadius: 2,
+    lineHeight: 24,
   },
 });
