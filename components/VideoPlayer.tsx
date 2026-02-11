@@ -6,12 +6,12 @@ import * as ScreenOrientation from 'expo-screen-orientation';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import React, { useEffect, useRef, useState } from 'react';
 import {
-  Dimensions,
-  PanResponder,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View
+    Dimensions,
+    PanResponder,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View
 } from 'react-native';
 
 const { width: windowWidth } = Dimensions.get('window');
@@ -26,6 +26,15 @@ interface CustomPlayerProps {
 export default function CustomPlayer({ videoUri, title, subtitles = [], onBack }: CustomPlayerProps) {
 
   const isDragging = useRef(false);
+
+  // DEBUG: Log first subtitle text before render
+  useEffect(() => {
+    if (subtitles && subtitles.length > 0) {
+      console.log('[RENDER DEBUG] First subtitle text:', subtitles[0].text);
+    } else {
+      console.log('[RENDER DEBUG] No subtitles available');
+    }
+  }, [subtitles]);
 
   // 1. Consolidated State
   const [isPlaying, setIsPlaying] = useState(false);
@@ -233,9 +242,18 @@ useEventListener(player, 'timeUpdate', (event) => {
         {/* Subtitle Display - IMPROVED VISIBILITY */}
         {currentSubtitle && (
           <View style={styles.subtitleWrapper}>
-            <View style={styles.subtitleContainer}>
+            <View style={[styles.subtitleContainer, { backgroundColor: 'rgba(0,0,0,0.7)' }]}> 
               <Text 
-                style={styles.subtitleText}
+                style={[
+                  styles.subtitleText,
+                  {
+                    color: '#FFEB3B', // Bright yellow for visibility
+                    fontSize: 28,
+                    textShadowColor: '#000',
+                    textShadowOffset: { width: 2, height: 2 },
+                    textShadowRadius: 4,
+                  },
+                ]}
                 numberOfLines={0}
               >
                 {currentSubtitle.text}
