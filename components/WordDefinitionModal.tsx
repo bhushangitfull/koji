@@ -1,13 +1,15 @@
-import React from 'react';
+import { Ionicons } from '@expo/vector-icons';
+import React, { useEffect } from 'react';
 import {
+  ActivityIndicator,
   Modal,
-  View,
+  Pressable,
+  ScrollView,
+  StyleSheet,
   Text,
   TouchableOpacity,
-  StyleSheet,
-  ScrollView,
+  View,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
 
 export interface WordDefinition {
   furigana: string;
@@ -20,15 +22,60 @@ interface WordDefinitionModalProps {
   visible: boolean;
   word: string | null;
   definition: WordDefinition | null;
+  subtitleText?: string | null;
   onClose: () => void;
+  onWordPress?: (word: string) => void;
+}
+
+// Component to render tappable words
+function TappableText({ text, onWordPress }: { text: string; onWordPress?: (word: string) => void }) {
+  // Check if text contains Japanese characters
+  const hasJapanese = /[\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FFF]/.test(text);
+  
+  if (!hasJapanese || !onWordPress) {
+    return <Text style={styles.meaning}>{text}</Text>;
+  }
+
+  // Split by whitespace and Japanese word boundaries
+  const parts = text.split(/(\s+|[\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FFF]+)/);
+
+  return (
+    <Text style={styles.meaning}>
+      {parts.map((part, index) => {
+        const isJapanese = /[\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FFF]/.test(part);
+        
+        if (!isJapanese) {
+          return <Text key={index}>{part}</Text>;
+        }
+
+        return (
+          <Pressable key={index} onPress={() => onWordPress(part)}>
+            <Text style={[styles.meaning, { textDecorationLine: 'underline', color: '#FF6B9D' }]}>
+              {part}
+            </Text>
+          </Pressable>
+        );
+      })}
+    </Text>
+  );
 }
 
 export default function WordDefinitionModal({
   visible,
   word,
   definition,
+  subtitleText,
   onClose,
+  onWordPress,
 }: WordDefinitionModalProps) {
+  useEffect(() => {
+    console.log('[WordDefinitionModal] State:', {
+      visible,
+      word,
+      definition,
+      definitionType: typeof definition,
+    });
+  }, [visible, word, definition]);
   return (
     <Modal
       visible={visible}
@@ -46,8 +93,14 @@ export default function WordDefinitionModal({
             </TouchableOpacity>
           </View>
 
-          <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-            {definition ? (
+          <ScrollView style={styles.content} showsVerticalScrollIndicator={true}>
+            {definition === undefined ? (
+              // Loading state
+              <View style={styles.loadingContainer}>
+                <ActivityIndicator size="large" color="#FF6B9D" />
+                <Text style={styles.loadingText}>Fetching definition...</Text>
+              </View>
+            ) : definition ? (
               <>
                 {/* Furigana */}
                 <View style={styles.section}>
@@ -58,7 +111,10 @@ export default function WordDefinitionModal({
                 {/* Meaning */}
                 <View style={styles.section}>
                   <Text style={styles.label}>Meaning</Text>
-                  <Text style={styles.meaning}>{definition.meaning}</Text>
+                  <TappableText 
+                    text={definition.meaning}
+                    onWordPress={onWordPress}
+                  />
                 </View>
 
                 {/* Part of Speech */}
@@ -72,7 +128,10 @@ export default function WordDefinitionModal({
                 {/* Example Sentence */}
                 <View style={styles.section}>
                   <Text style={styles.label}>Example</Text>
-                  <Text style={styles.example}>{definition.exampleSentence}</Text>
+                  <TappableText 
+                    text={definition.exampleSentence}
+                    onWordPress={onWordPress}
+                  />
                 </View>
               </>
             ) : (
@@ -104,7 +163,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
     borderRadius: 16,
     width: '85%',
-    maxHeight: '75%',
+    maxHeight: '70%',
     paddingHorizontal: 20,
     paddingTop: 16,
     paddingBottom: 20,
@@ -113,12 +172,17 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.25,
     shadowRadius: 8,
     elevation: 5,
+    overflow: 'hidden',
+    flexDirection: 'column',
   },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 16,
+    marginBottom: 12,
+    paddingBottom: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: '#EEE',
   },
   wordText: {
     fontSize: 28,
@@ -130,8 +194,9 @@ const styles = StyleSheet.create({
     padding: 8,
   },
   content: {
-    flex: 1,
-    marginBottom: 12,
+    minHeight: 150,
+    maxHeight: 300,
+    paddingRight: 8,
   },
   section: {
     marginBottom: 16,
@@ -192,5 +257,15 @@ const styles = StyleSheet.create({
     color: '#BBB',
     marginTop: 6,
     textAlign: 'center',
+  },
+  loadingContainer: {
+    alignItems: 'center',
+    paddingVertical: 48,
+  },
+  loadingText: {
+    fontSize: 14,
+    color: '#999',
+    marginTop: 12,
+    fontWeight: '500',
   },
 });

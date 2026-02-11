@@ -1,9 +1,63 @@
 /**
  * Flashcard Generator
- * Generates flashcards from extracted vocabulary using mock data + OpenAI
+ * Generates flashcards from extracted vocabulary using Jisho API + OpenAI
  */
 
 import { supabase } from '@/utils/supabase';
+
+// Jisho API Types
+export interface JishoDefinition {
+  kanji: string;
+  hiragana: string;
+  meaning: string;
+  partOfSpeech: string;
+  exampleSentence?: string;
+}
+
+// Query Jisho API for word definition
+export async function getJishoDefinition(word: string): Promise<JishoDefinition | null> {
+  try {
+    console.log('[Jisho] Looking up word:', word);
+    
+    const response = await fetch(`https://jisho.org/api/v1/search/words?keyword=${encodeURIComponent(word)}`);
+    
+    if (!response.ok) {
+      console.warn(`[Jisho] API error: ${response.statusText}`);
+      return null;
+    }
+
+    const data = await response.json();
+    console.log('[Jisho] API Response:', data);
+    
+    if (!data.data || data.data.length === 0) {
+      console.log('[Jisho] No results found for:', word);
+      return null;
+    }
+
+    const entry = data.data[0];
+    const japaneseEntry = entry.japanese?.[0];
+    const definition = entry.senses?.[0];
+
+    if (!japaneseEntry || !definition) {
+      console.log('[Jisho] Missing japanese or senses data');
+      return null;
+    }
+
+    const result: JishoDefinition = {
+      kanji: japaneseEntry.word || word,
+      hiragana: japaneseEntry.reading || '',
+      meaning: (definition.english_definitions && definition.english_definitions[0]) || 'No definition found',
+      partOfSpeech: (definition.parts_of_speech && definition.parts_of_speech[0]) || 'unknown',
+      exampleSentence: '',
+    };
+    
+    console.log('[Jisho] Definition found:', result);
+    return result;
+  } catch (error) {
+    console.error('[Jisho] Error:', error);
+    return null;
+  }
+}
 
 // Mock Japanese vocabulary dictionary for offline use
 const VOCABULARY_DICTIONARY: Record<string, {
@@ -128,10 +182,23 @@ export function getFromDictionary(word: string) {
   return VOCABULARY_DICTIONARY[word] || null;
 }
 
-// Generate definition using OpenAI (optional, requires API key)
+// Generate definition using Jisho API (primary) + OpenAI (optional)
 export async function generateDefinitionWithAI(word: string, apiKey?: string) {
+  // Try Jisho first (real-time translation)
+  const jishoResult = await getJishoDefinition(word);
+  
+  if (jishoResult) {
+    return {
+      furigana: jishoResult.hiragana,
+      meaning: jishoResult.meaning,
+      partOfSpeech: jishoResult.partOfSpeech,
+      exampleSentence: jishoResult.exampleSentence || `Example with ${jishoResult.kanji}`,
+    };
+  }
+
+  // Fallback to OpenAI if Jisho doesn't find it
   if (!apiKey) {
-    return getFromDictionary(word);
+    return null;
   }
 
   try {
@@ -163,24 +230,24 @@ Only return valid JSON, no other text.`,
 
     if (!response.ok) {
       console.warn(`OpenAI API error: ${response.statusText}`);
-      return getFromDictionary(word);
+      return null;
     }
 
     const data = await response.json();
     const content = data.choices?.[0]?.message?.content;
 
     if (!content) {
-      return getFromDictionary(word);
+      return null;
     }
 
     try {
       return JSON.parse(content);
     } catch {
-      return getFromDictionary(word);
+      return null;
     }
   } catch (error) {
     console.error('Error calling OpenAI:', error);
-    return getFromDictionary(word);
+    return null;
   }
 }
 

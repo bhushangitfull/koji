@@ -15,7 +15,7 @@ import {
   Pressable,
 } from 'react-native';
 import WordDefinitionModal, { WordDefinition } from './WordDefinitionModal';
-import { getFromDictionary } from '@/utils/flashcardGenerator';
+import { getJishoDefinition } from '@/utils/flashcardGenerator';
 
 const { width: windowWidth } = Dimensions.get('window');
 
@@ -30,7 +30,7 @@ export default function CustomPlayer({ videoUri, title, subtitles = [], onBack }
 
   const isDragging = useRef(false);
   const [selectedWord, setSelectedWord] = useState<string | null>(null);
-  const [selectedDefinition, setSelectedDefinition] = useState<WordDefinition | null>(null);
+  const [selectedDefinition, setSelectedDefinition] = useState<WordDefinition | null | undefined>(undefined);
   const [definitionModalVisible, setDefinitionModalVisible] = useState(false);
 
   // DEBUG: Log first subtitle text before render
@@ -229,11 +229,45 @@ useEventListener(player, 'timeUpdate', (event) => {
     return `${m}:${r.toString().padStart(2, '0')}`;
   };
 
-  const handleWordPress = (word: string) => {
-    setSelectedWord(word);
-    const definition = getFromDictionary(word);
-    setSelectedDefinition(definition);
+  const handleWordPress = async (word: string) => {
+    // Extract only Japanese characters (kanji, hiragana, katakana)
+    const japaneseOnly = word.replace(/[^\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FFF]/g, '');
+    
+    if (!japaneseOnly) {
+      console.log('[VideoPlayer] No Japanese characters found in:', word);
+      return;
+    }
+    
+    // If word is too long and contains multiple kanji/words, try to extract first word only
+    // Split by hiragana boundaries to get first meaningful unit
+    let wordToLookup = japaneseOnly;
+    
+    // If it's multiple kanji/hiragana, try to get first meaningful chunk
+    // Match first kanji + following hiragana, or just first character
+    const firstWordMatch = japaneseOnly.match(/[\u4E00-\u9FFF]+[\u3040-\u309F]*/);
+    if (firstWordMatch) {
+      wordToLookup = firstWordMatch[0];
+    }
+    
+    console.log('[VideoPlayer] Word pressed (cleaned):', wordToLookup, '(original:', word + ')');
+    setSelectedWord(wordToLookup);
     setDefinitionModalVisible(true);
+    setSelectedDefinition(undefined); // Show loading state
+    
+    // Fetch definition from Jisho API
+    const definition = await getJishoDefinition(wordToLookup);
+    console.log('[VideoPlayer] Got definition:', definition);
+    
+    if (definition) {
+      setSelectedDefinition({
+        furigana: definition.hiragana,
+        meaning: definition.meaning,
+        partOfSpeech: definition.partOfSpeech,
+        exampleSentence: definition.exampleSentence || '',
+      });
+    } else {
+      setSelectedDefinition(null);
+    }
   };
 
   const handleCloseDefinition = () => {
@@ -365,6 +399,7 @@ useEventListener(player, 'timeUpdate', (event) => {
         word={selectedWord}
         definition={selectedDefinition}
         onClose={handleCloseDefinition}
+        onWordPress={handleWordPress}
       />
     </View>
   );
