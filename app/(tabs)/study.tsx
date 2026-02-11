@@ -3,9 +3,17 @@ import { RetroWindow } from '@/components/ui/retro-window';
 import { Colors, Fonts } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { Feather, MaterialIcons } from '@expo/vector-icons';
-import { useState } from 'react';
-import { Modal, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { useEffect, useState } from 'react';
+import { Modal, ScrollView, StyleSheet, Text, TouchableOpacity, View, TextInput, ActivityIndicator, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { AudioPlayer } from '@/components/AudioPlayer';
+import { useFlashcards } from '@/hooks/useFlashcards';
+import { useQuizzes, useQuizQuestions } from '@/hooks/useQuizzes';
+import { useEpisodes } from '@/hooks/useEpisodes';
+import { useFlashcardProgress } from '@/hooks/useFlashcardProgress';
+import { useAuth } from '@/hooks/useAuth';
+import { supabase } from '@/utils/supabase';
+import { Flashcard, QuizQuestion, QuestionType, QuizAttempt } from '@/types/study';
 
 // Mock streak calendar data - 52 weeks * 7 days
 const generateStreakData = () => {
@@ -37,72 +45,6 @@ const getStreakColor = (level: number) => {
   }
 };
 
-const STUDY_SESSIONS = [
-  {
-    id: 1,
-    type: 'vocabulary',
-    title: 'Vocabulary Review',
-    description: 'Learn 15 new words from Attack on Titan',
-    duration: '12 mins',
-    progress: 8,
-    total: 15,
-    icon: 'book-open',
-  },
-  {
-    id: 2,
-    type: 'quiz',
-    title: 'Episode Quiz',
-    description: 'Demon Slayer Episode 5 - Fill in the blanks',
-    duration: '8 mins',
-    progress: 0,
-    total: 10,
-    icon: 'help-circle',
-  },
-  {
-    id: 4,
-    type: 'phrases',
-    title: 'Phrases Test',
-    description: 'Master common phrases and expressions',
-    duration: '10 mins',
-    progress: 0,
-    total: 12,
-    icon: 'message-circle',
-  },
-];
-
-const VOCABULARY_SAMPLES = [
-  { id: 1, word: '進撃', reading: 'しんげき', meaning: 'advance/charge', example: '進撃の巨人' },
-  { id: 2, word: '巨人', reading: 'きょじん', meaning: 'giant', example: '巨人が来た' },
-  { id: 3, word: '壁', reading: 'かべ', meaning: 'wall', example: '壁の外' },
-];
-
-const QUIZ_SAMPLES = [
-  {
-    id: 1,
-    question: 'What does "勇気" mean?',
-    options: ['courage', 'fear', 'anger', 'sadness'],
-    correct: 0,
-  },
-  {
-    id: 2,
-    question: 'Fill the blank: 私は___が好きです (I like ___)',
-    options: ['books', 'water', 'music', 'sleep'],
-    correct: 2,
-  },
-];
-
-const KANJI_SAMPLES = [
-  { id: 1, kanji: '火', reading: 'ひ', meaning: 'fire', strokes: 4 },
-  { id: 2, kanji: '木', reading: 'き', meaning: 'tree', strokes: 4 },
-  { id: 3, kanji: '水', reading: 'みず', meaning: 'water', strokes: 4 },
-];
-
-const PHRASES_SAMPLES = [
-  { id: 1, phrase: 'おはようございます', reading: 'ohayou gozaimasu', meaning: 'Good morning (polite)', context: 'Greeting' },
-  { id: 2, phrase: 'ありがとうございます', reading: 'arigatou gozaimasu', meaning: 'Thank you very much', context: 'Gratitude' },
-  { id: 3, phrase: 'すみません', reading: 'sumimasen', meaning: 'Excuse me / Sorry', context: 'Apology' },
-];
-
 const DAILY_CHALLENGES = [
   { id: 1, title: 'Learn 20 new words', points: 50, completed: true },
   { id: 2, title: 'Complete 3 quizzes', points: 75, completed: false },
@@ -110,14 +52,37 @@ const DAILY_CHALLENGES = [
   { id: 4, title: 'Build 5-day streak', points: 60, completed: true },
 ];
 
+interface SessionState {
+  type: 'flashcard' | 'quiz';
+  episodeId: string;
+  episodeTitle: string;
+  data: Flashcard[] | QuizQuestion[];
+  quizId?: string;
+}
+
 export default function StudyScreen() {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
+  const { user } = useAuth();
+  
+  // Data hooks
+  const { episodes, loading: episodesLoading } = useEpisodes();
+  const [selectedEpisodeId, setSelectedEpisodeId] = useState<string | undefined>();
+  const { flashcards } = useFlashcards(selectedEpisodeId);
+  const { quizzes } = useQuizzes(selectedEpisodeId);
+  const [selectedQuizId, setSelectedQuizId] = useState<string | undefined>();
+  const { questions: quizQuestions } = useQuizQuestions(selectedQuizId);
+  const { progress: flashcardProgress, recordFlashcardReview } = useFlashcardProgress(user?.id);
+
+  // UI state
   const [streakModalVisible, setStreakModalVisible] = useState(false);
   const [testModalVisible, setTestModalVisible] = useState(false);
-  const [activeSession, setActiveSession] = useState<any>(null);
+  const [activeSession, setActiveSession] = useState<SessionState | null>(null);
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [flipped, setFlipped] = useState(false);
+  const [userAnswers, setUserAnswers] = useState<Record<string, string>>({});
+  const [submitting, setSubmitting] = useState(false);
+  const [quizScore, setQuizScore] = useState<number | null>(null);
   const streakData = generateStreakData();
 
   const renderStreakDay = (item: { date: Date; level: number }, index: number) => (
@@ -134,111 +99,286 @@ export default function StudyScreen() {
     />
   );
 
-  const openTestModal = (session: any) => {
-    setActiveSession(session);
+  const openFlashcardModal = (episodeId: string, episodeTitle: string) => {
+    setSelectedEpisodeId(episodeId);
+    setActiveSession({
+      type: 'flashcard',
+      episodeId,
+      episodeTitle,
+      data: flashcards,
+    });
     setCurrentQuestionIndex(0);
     setFlipped(false);
+    setUserAnswers({});
+    setQuizScore(null);
+    setTestModalVisible(true);
+  };
+
+  const openQuizModal = (episodeId: string, episodeTitle: string, quizId: string) => {
+    setSelectedEpisodeId(episodeId);
+    setSelectedQuizId(quizId);
+    setActiveSession({
+      type: 'quiz',
+      episodeId,
+      episodeTitle,
+      data: quizQuestions,
+      quizId,
+    });
+    setCurrentQuestionIndex(0);
+    setFlipped(false);
+    setUserAnswers({});
+    setQuizScore(null);
     setTestModalVisible(true);
   };
 
   const closeTestModal = () => {
     setTestModalVisible(false);
     setActiveSession(null);
+    setUserAnswers({});
+    setQuizScore(null);
+    setSelectedEpisodeId(undefined);
+    setSelectedQuizId(undefined);
   };
 
   const renderTestContent = () => {
     if (!activeSession) return null;
 
-    if (activeSession.type === 'vocabulary') {
-      const sample = VOCABULARY_SAMPLES[currentQuestionIndex];
+    if (activeSession.type === 'flashcard' && flashcards.length > 0) {
+      const card = flashcards[currentQuestionIndex];
       return (
         <View style={styles.testContent}>
-          <Text style={[styles.testQuestion, { color: '#000000' }]}>Word {currentQuestionIndex + 1}</Text>
+          <Text style={[styles.testQuestion, { color: '#000000' }]}>
+            Word {currentQuestionIndex + 1}
+          </Text>
           <View style={[styles.vocabCard, { borderColor: colors.primary }]}>
-            <Text style={[styles.vocabWord, { color: colors.primary }]}>{sample.word}</Text>
-            <Text style={[styles.vocabReading, { color: '#666666' }]}>{sample.reading}</Text>
-            <Text style={[styles.vocabMeaning, { color: '#333333' }]}>{sample.meaning}</Text>
-            <View style={[styles.vocabExample, { backgroundColor: colors.primary + '10' }]}>
-              <Text style={[styles.vocabExampleText, { color: '#666666' }]}>Example: {sample.example}</Text>
-            </View>
-          </View>
-        </View>
-      );
-    }
-
-    if (activeSession.type === 'quiz') {
-      const quiz = QUIZ_SAMPLES[currentQuestionIndex];
-      return (
-        <View style={styles.testContent}>
-          <Text style={[styles.testQuestion, { color: '#000000' }]}>{quiz.question}</Text>
-          <View style={styles.optionsContainer}>
-            {quiz.options.map((option, idx) => (
-              <TouchableOpacity
-                key={idx}
-                style={[
-                  styles.optionButton,
-                  {
-                    backgroundColor: idx === quiz.correct ? colors.primary + '20' : '#F5F5F5',
-                    borderColor: idx === quiz.correct ? colors.primary : '#E0E0E0',
-                  },
-                ]}
-              >
-                <Text style={[styles.optionText, { color: '#000000' }]}>{option}</Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-        </View>
-      );
-    }
-
-    if (activeSession.type === 'flashcard') {
-      const kanji = KANJI_SAMPLES[currentQuestionIndex];
-      return (
-        <TouchableOpacity onPress={() => setFlipped(!flipped)} style={styles.testContent}>
-          <Text style={[styles.testQuestion, { color: '#000000' }]}>Kanji {currentQuestionIndex + 1}</Text>
-          <View style={[styles.flashcard, { backgroundColor: flipped ? colors.primary + '15' : '#FFF' }]}>
-            {!flipped ? (
-              <>
-                <Text style={[styles.kanjiLarge, { color: colors.primary }]}>{kanji.kanji}</Text>
-                <Text style={[styles.flipHint, { color: '#999999' }]}>Tap to reveal</Text>
-              </>
-            ) : (
-              <>
-                <Text style={[styles.kanjiReading, { color: '#333333' }]}>{kanji.reading}</Text>
-                <Text style={[styles.kanjiMeaning, { color: '#666666' }]}>{kanji.meaning}</Text>
-                <Text style={[styles.kanjiStrokes, { color: '#9B59B6' }]}>Strokes: {kanji.strokes}</Text>
-              </>
+            <Text style={[styles.vocabWord, { color: colors.primary }]}>
+              {card.japanese_text}
+            </Text>
+            {card.furigana && (
+              <Text style={[styles.vocabReading, { color: '#666666' }]}>
+                {card.furigana}
+              </Text>
+            )}
+            <Text style={[styles.vocabMeaning, { color: '#333333' }]}>
+              {card.english_translation}
+            </Text>
+            {card.part_of_speech && (
+              <Text style={[styles.vocabPos, { color: '#999999' }]}>
+                ({card.part_of_speech})
+              </Text>
+            )}
+            {card.audio_url && (
+              <AudioPlayer
+                audioUrl={card.audio_url}
+                startTime={card.audio_start_time}
+                endTime={card.audio_end_time}
+                label="Pronunciation"
+              />
+            )}
+            {card.example_sentence && (
+              <View style={[styles.vocabExample, { backgroundColor: colors.primary + '10' }]}>
+                <Text style={[styles.vocabExampleText, { color: '#666666' }]}>
+                  Example: {card.example_sentence}
+                </Text>
+              </View>
             )}
           </View>
-        </TouchableOpacity>
+        </View>
       );
     }
 
-    if (activeSession.type === 'phrases') {
-      const phrase = PHRASES_SAMPLES[currentQuestionIndex];
+    if (activeSession.type === 'quiz' && quizQuestions.length > 0) {
+      const question = quizQuestions[currentQuestionIndex];
+      const isAnswered = userAnswers[question.id] !== undefined;
+
+      if (question.question_type === QuestionType.LISTENING && question.audio_url) {
+        return (
+          <View style={styles.testContent}>
+            <Text style={[styles.testQuestion, { color: '#000000' }]}>
+              {question.question_text}
+            </Text>
+            <AudioPlayer audioUrl={question.audio_url} label="Listen" />
+            {question.options && (
+              <View style={styles.optionsContainer}>
+                {question.options.map((option, idx) => (
+                  <TouchableOpacity
+                    key={idx}
+                    style={[
+                      styles.optionButton,
+                      {
+                        backgroundColor:
+                          userAnswers[question.id] === option
+                            ? colors.primary + '20'
+                            : '#F5F5F5',
+                        borderColor:
+                          userAnswers[question.id] === option
+                            ? colors.primary
+                            : '#E0E0E0',
+                      },
+                    ]}
+                    onPress={() =>
+                      setUserAnswers({ ...userAnswers, [question.id]: option })
+                    }
+                  >
+                    <Text style={[styles.optionText, { color: '#000000' }]}>
+                      {option}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            )}
+          </View>
+        );
+      }
+
+      if (question.question_type === QuestionType.FILL_BLANK) {
+        return (
+          <View style={styles.testContent}>
+            <Text style={[styles.testQuestion, { color: '#000000' }]}>
+              {question.question_text}
+            </Text>
+            <TextInput
+              style={[
+                styles.fillBlankInput,
+                { borderColor: colors.primary, color: '#000000' },
+              ]}
+              placeholder="Type your answer..."
+              placeholderTextColor="#999999"
+              value={userAnswers[question.id] || ''}
+              onChangeText={(text) =>
+                setUserAnswers({ ...userAnswers, [question.id]: text })
+              }
+            />
+          </View>
+        );
+      }
+
+      // Multiple choice
       return (
         <View style={styles.testContent}>
-          <Text style={[styles.testQuestion, { color: '#000000' }]}>Phrase {currentQuestionIndex + 1}</Text>
-          <View style={[styles.phraseCard, { borderColor: colors.primary }]}>
-            <Text style={[styles.phraseJapanese, { color: colors.primary }]}>{phrase.phrase}</Text>
-            <Text style={[styles.phraseRomaji, { color: '#666666' }]}>{phrase.reading}</Text>
-            <Text style={[styles.phraseMeaning, { color: '#333333' }]}>{phrase.meaning}</Text>
-            <View style={[styles.phraseContext, { backgroundColor: colors.primary + '10' }]}>
-              <Text style={[styles.phraseContextLabel, { color: '#9B59B6' }]}>Context:</Text>
-              <Text style={[styles.phraseContextText, { color: '#666666' }]}>{phrase.context}</Text>
+          <Text style={[styles.testQuestion, { color: '#000000' }]}>
+            {question.question_text}
+          </Text>
+          {question.options && (
+            <View style={styles.optionsContainer}>
+              {question.options.map((option, idx) => (
+                <TouchableOpacity
+                  key={idx}
+                  style={[
+                    styles.optionButton,
+                    {
+                      backgroundColor:
+                        userAnswers[question.id] === option
+                          ? colors.primary + '20'
+                          : '#F5F5F5',
+                      borderColor:
+                        userAnswers[question.id] === option
+                          ? colors.primary
+                          : '#E0E0E0',
+                    },
+                  ]}
+                  onPress={() =>
+                    setUserAnswers({ ...userAnswers, [question.id]: option })
+                  }
+                >
+                  <Text style={[styles.optionText, { color: '#000000' }]}>
+                    {option}
+                  </Text>
+                </TouchableOpacity>
+              ))}
             </View>
+          )}
+        </View>
+      );
+    }
+
+    if (quizScore !== null) {
+      const percentage = Math.round(quizScore);
+      return (
+        <View style={styles.testContent}>
+          <Text style={[styles.testQuestion, { color: '#000000' }]}>Quiz Complete!</Text>
+          <View
+            style={[
+              styles.scoreCard,
+              { backgroundColor: colors.primary + '15', borderColor: colors.primary },
+            ]}
+          >
+            <Text style={[styles.scoreText, { color: colors.primary }]}>
+              {percentage}%
+            </Text>
+            <Text style={[styles.scoreLabel, { color: '#666666' }]}>
+              {percentage >= 80
+                ? 'Excellent!'
+                : percentage >= 60
+                ? 'Good job!'
+                : 'Keep practicing!'}
+            </Text>
           </View>
         </View>
       );
     }
+
+    return (
+      <View style={styles.testContent}>
+        <Text style={[styles.testQuestion, { color: '#000000' }]}>No content available</Text>
+      </View>
+    );
   };
 
   const getMaxSamples = () => {
-    if (activeSession?.type === 'vocabulary') return VOCABULARY_SAMPLES.length;
-    if (activeSession?.type === 'quiz') return QUIZ_SAMPLES.length;
-    if (activeSession?.type === 'flashcard') return KANJI_SAMPLES.length;
-    if (activeSession?.type === 'phrases') return PHRASES_SAMPLES.length;
+    if (activeSession?.type === 'flashcard') return flashcards.length;
+    if (activeSession?.type === 'quiz') return quizQuestions.length;
     return 0;
+  };
+
+  const handleSubmitQuiz = async () => {
+    if (!activeSession || !user || activeSession.type !== 'quiz') return;
+
+    try {
+      setSubmitting(true);
+      let correctCount = 0;
+
+      // Calculate score
+      quizQuestions.forEach((question) => {
+        const userAnswer = userAnswers[question.id];
+        if (userAnswer && userAnswer.toLowerCase() === question.correct_answer.toLowerCase()) {
+          correctCount++;
+        }
+      });
+
+      const percentage = (correctCount / quizQuestions.length) * 100;
+      setQuizScore(percentage);
+
+      // Save quiz attempt to Supabase
+      if (activeSession.quizId) {
+        await supabase.from('user_quiz_attempts').insert({
+          user_id: user.id,
+          quiz_id: activeSession.quizId,
+          score: correctCount,
+          total_questions: quizQuestions.length,
+          percentage_correct: Math.round(percentage),
+          answers: userAnswers,
+          attempted_at: new Date().toISOString(),
+        });
+      }
+    } catch (error) {
+      console.error('Error submitting quiz:', error);
+      Alert.alert('Error', 'Failed to submit quiz. Please try again.');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleFlashcardReview = async (isCorrect: boolean) => {
+    if (!activeSession || !user || activeSession.type !== 'flashcard') return;
+
+    const card = flashcards[currentQuestionIndex];
+    if (!card) return;
+
+    const success = await recordFlashcardReview(card.id, isCorrect, user.id);
+    if (!success) {
+      Alert.alert('Error', 'Failed to record flashcard review');
+    }
   };
 
   const renderStreakWeek = (weekDays: any[], weekIndex: number) => (
@@ -391,53 +531,76 @@ export default function StudyScreen() {
 
         {/* Study Sessions */}
         <RetroWindow title="Start Learning" color="purple" style={styles.windowSection}>
-          {STUDY_SESSIONS.map((session) => (
-            <View key={session.id} style={styles.sessionCard}>
-              <View style={styles.sessionHeader}>
-                <View style={styles.sessionLeft}>
-                  <View style={[styles.sessionIcon, { backgroundColor: colors.primary + '20' }]}>
-                    <Feather name={session.icon as any} size={20} color={colors.primary} />
-                  </View>
-                  <View>
-                    <Text style={[styles.sessionTitle, { color: '#000000' }]}>{session.title}</Text>
-                    <Text style={[styles.sessionDescription, { color: '#666666' }]}>
-                      {session.description}
-                    </Text>
+          {episodesLoading ? (
+            <ActivityIndicator size="large" color={colors.primary} />
+          ) : episodes.length === 0 ? (
+            <Text style={[styles.emptyText, { color: '#666666' }]}>
+              No episodes available. Upload episodes to get started!
+            </Text>
+          ) : (
+            episodes.map((episode) => (
+              <View key={episode.id} style={styles.sessionCard}>
+                <View style={styles.sessionHeader}>
+                  <View style={styles.sessionLeft}>
+                    <View style={[styles.sessionIcon, { backgroundColor: colors.primary + '20' }]}>
+                      <Feather name="video" size={20} color={colors.primary} />
+                    </View>
+                    <View>
+                      <Text style={[styles.sessionTitle, { color: '#000000' }]}>
+                        {episode.title}
+                      </Text>
+                      <Text style={[styles.sessionDescription, { color: '#666666' }]}>
+                        Learn vocabulary from this episode
+                      </Text>
+                    </View>
                   </View>
                 </View>
-                <Text style={[styles.sessionDuration, { color: colors.primary }]}>{session.duration}</Text>
+
+                <View style={styles.episodeActions}>
+                  {flashcards.length > 0 && (
+                    <TouchableOpacity
+                      style={[styles.actionButton, { backgroundColor: colors.primary + '20' }]}
+                      onPress={() =>
+                        openFlashcardModal(episode.id, episode.title)
+                      }
+                    >
+                      <Text
+                        style={[
+                          styles.actionButtonText,
+                          { color: colors.primary },
+                        ]}
+                      >
+                        📚 Flashcards ({flashcards.length})
+                      </Text>
+                    </TouchableOpacity>
+                  )}
+
+                  {quizzes.length > 0 ? (
+                    <TouchableOpacity
+                      style={[styles.actionButton, { backgroundColor: colors.primary }]}
+                      onPress={() => {
+                        const firstQuiz = quizzes[0];
+                        openQuizModal(episode.id, episode.title, firstQuiz.id);
+                      }}
+                    >
+                      <Text style={[styles.actionButtonText, { color: '#FFF' }]}>
+                        ✏️ Quiz ({quizzes[0]?.total_questions || 0} Q)
+                      </Text>
+                    </TouchableOpacity>
+                  ) : (
+                    <TouchableOpacity
+                      style={[styles.actionButton, { backgroundColor: '#E0E0E0' }]}
+                      disabled
+                    >
+                      <Text style={[styles.actionButtonText, { color: '#999999' }]}>
+                        ✏️ No quiz yet
+                      </Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
               </View>
-
-              {session.progress > 0 && (
-                <View style={styles.sessionProgress}>
-                  <View style={styles.progressBar}>
-                    <View
-                      style={[
-                        styles.progressFill,
-                        {
-                          width: `${(session.progress / session.total) * 100}%`,
-                          backgroundColor: colors.primary,
-                        },
-                      ]}
-                    />
-                  </View>
-                  <Text style={[styles.progressText, { color: '#666666' }]}>
-                    {session.progress}/{session.total}
-                  </Text>
-                </View>
-              )}
-
-              <TouchableOpacity
-                style={[styles.sessionButton, { backgroundColor: colors.primary }]}
-                onPress={() => openTestModal(session)}
-              >
-                <Text style={[styles.sessionButtonText, { color: '#FFF' }]}>
-                  {session.progress > 0 ? 'Continue' : 'Start'}
-                </Text>
-                <Feather name="arrow-right" size={16} color="#FFF" />
-              </TouchableOpacity>
-            </View>
-          ))}
+            ))
+          )}
         </RetroWindow>
 
          {/* Weekly Test CTA */}
@@ -472,7 +635,9 @@ export default function StudyScreen() {
               <TouchableOpacity onPress={closeTestModal}>
                 <Feather name="x" size={24} color="#333333" />
               </TouchableOpacity>
-              <Text style={[styles.testModalTitle, { color: '#000000' }]}>{activeSession?.title}</Text>
+               <Text style={[styles.testModalTitle, { color: '#000000' }]}>
+                 {activeSession?.type === 'flashcard' ? 'Flashcards' : 'Quiz'} - {activeSession?.episodeTitle}
+               </Text>
               <View style={styles.testProgress}>
                 <Text style={[styles.testProgressText, { color: '#666666' }]}>
                   {currentQuestionIndex + 1}/{getMaxSamples()}
@@ -487,42 +652,70 @@ export default function StudyScreen() {
               {renderTestContent()}
             </ScrollView>
 
-            <View style={styles.testModalFooter}>
+             <View style={styles.testModalFooter}>
               <TouchableOpacity
-                disabled={currentQuestionIndex === 0}
-                onPress={() => setCurrentQuestionIndex(currentQuestionIndex - 1)}
-                style={[styles.navButton, { opacity: currentQuestionIndex === 0 ? 0.5 : 1 }]}
-              >
-                <Feather name="chevron-left" size={24} color={colors.primary} />
-              </TouchableOpacity>
+                 disabled={currentQuestionIndex === 0}
+                 onPress={() => setCurrentQuestionIndex(currentQuestionIndex - 1)}
+                 style={[styles.navButton, { opacity: currentQuestionIndex === 0 ? 0.5 : 1 }]}
+               >
+                 <Feather name="chevron-left" size={24} color={colors.primary} />
+               </TouchableOpacity>
 
-              <View style={styles.progressIndicator}>
-                {Array.from({ length: getMaxSamples() }).map((_, idx) => (
-                  <View
-                    key={idx}
-                    style={[
-                      styles.progressDot,
-                      {
-                        backgroundColor:
-                          idx === currentQuestionIndex
-                            ? colors.primary
-                            : idx < currentQuestionIndex
-                            ? colors.primary + '50'
-                            : '#E0E0E0',
-                      },
-                    ]}
-                  />
-                ))}
-              </View>
+               <View style={styles.progressIndicator}>
+                 {Array.from({ length: getMaxSamples() }).map((_, idx) => (
+                   <View
+                     key={idx}
+                     style={[
+                       styles.progressDot,
+                       {
+                         backgroundColor:
+                           idx === currentQuestionIndex
+                             ? colors.primary
+                             : idx < currentQuestionIndex
+                             ? colors.primary + '50'
+                             : '#E0E0E0',
+                       },
+                     ]}
+                   />
+                 ))}
+               </View>
 
-              <TouchableOpacity
-                disabled={currentQuestionIndex === getMaxSamples() - 1}
-                onPress={() => setCurrentQuestionIndex(currentQuestionIndex + 1)}
-                style={[styles.navButton, { opacity: currentQuestionIndex === getMaxSamples() - 1 ? 0.5 : 1 }]}
-              >
-                <Feather name="chevron-right" size={24} color={colors.primary} />
-              </TouchableOpacity>
-            </View>
+               {activeSession?.type === 'quiz' &&
+               currentQuestionIndex === getMaxSamples() - 1 &&
+               quizScore === null ? (
+                 <TouchableOpacity
+                   style={[styles.navButton, { backgroundColor: colors.primary, padding: 12 }]}
+                   onPress={handleSubmitQuiz}
+                   disabled={submitting}
+                 >
+                   {submitting ? (
+                     <ActivityIndicator color="#FFF" size="small" />
+                   ) : (
+                     <Text style={{ color: '#FFF', fontWeight: '600' }}>Submit</Text>
+                   )}
+                 </TouchableOpacity>
+               ) : (
+                 <TouchableOpacity
+                   disabled={
+                     currentQuestionIndex === getMaxSamples() - 1 ||
+                     getMaxSamples() === 0
+                   }
+                   onPress={() => setCurrentQuestionIndex(currentQuestionIndex + 1)}
+                   style={[
+                     styles.navButton,
+                     {
+                       opacity:
+                         currentQuestionIndex === getMaxSamples() - 1 ||
+                         getMaxSamples() === 0
+                           ? 0.5
+                           : 1,
+                     },
+                   ]}
+                 >
+                   <Feather name="chevron-right" size={24} color={colors.primary} />
+                 </TouchableOpacity>
+               )}
+             </View>
           </SafeAreaView>
         </Modal>
       </ScrollView>
@@ -987,5 +1180,62 @@ const styles = StyleSheet.create({
     width: 8,
     height: 8,
     borderRadius: 4,
+  },
+  /* New styles for real data */
+  emptyText: {
+    fontSize: 14,
+    textAlign: 'center',
+    paddingVertical: 20,
+    fontFamily: Fonts.sans,
+  },
+  episodeActions: {
+    flexDirection: 'row',
+    gap: 10,
+    marginTop: 12,
+  },
+  actionButton: {
+    flex: 1,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
+  },
+  actionButtonText: {
+    fontSize: 12,
+    fontWeight: '600',
+    fontFamily: Fonts.sans,
+  },
+  fillBlankInput: {
+    borderWidth: 2,
+    borderRadius: 10,
+    padding: 12,
+    marginTop: 12,
+    fontSize: 14,
+    fontFamily: Fonts.sans,
+  },
+  scoreCard: {
+    borderWidth: 2,
+    borderRadius: 12,
+    padding: 24,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginTop: 20,
+    gap: 12,
+  },
+  scoreText: {
+    fontSize: 48,
+    fontWeight: 'bold',
+    fontFamily: Fonts.rounded,
+  },
+  scoreLabel: {
+    fontSize: 16,
+    fontFamily: Fonts.sans,
+  },
+  vocabPos: {
+    fontSize: 12,
+    fontStyle: 'italic',
   },
 });

@@ -3,12 +3,14 @@ import { RetroWindow } from '@/components/ui/retro-window';
 import { Colors, Fonts } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useEpisodeUpload } from '@/hooks/useEpisodeUpload';
+import { useFlashcardGeneration } from '@/hooks/useFlashcardGeneration';
 import { formatFileSize, initializeAppDirectories } from '@/utils/fileSystem';
 import { Feather, MaterialIcons } from '@expo/vector-icons';
 import * as DocumentPicker from 'expo-document-picker';
+import * as FileSystem from 'expo-file-system';
 import { useRouter } from 'expo-router';
-import { useCallback, useEffect } from 'react';
-import { Alert, FlatList, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { useCallback, useEffect, useState } from 'react';
+import { Alert, FlatList, Modal, ScrollView, StyleSheet, Text, TouchableOpacity, View, ActivityIndicator, ProgressBarAndroid } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 const getStatusColor = (status: string) => {
@@ -42,6 +44,9 @@ export default function LibraryScreen() {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
   const { episodes, uploadEpisode, deleteEpisode, updateSubtitles, isLoading } = useEpisodeUpload();
+  const generation = useFlashcardGeneration();
+  const [generationModalVisible, setGenerationModalVisible] = useState(false);
+  const [selectedEpisodeForGeneration, setSelectedEpisodeForGeneration] = useState<string | null>(null);
 
   // Initialize app directories on mount
   useEffect(() => {
@@ -170,109 +175,172 @@ export default function LibraryScreen() {
     [updateSubtitles]
   );
 
+  const handleGenerateFlashcards = useCallback(
+    async (episodeId: string) => {
+      const episode = episodes.find((e) => e.id === episodeId);
+      if (!episode || !episode.subtitleUri) {
+        Alert.alert('No Subtitles', 'Please add subtitles before generating flashcards');
+        return;
+      }
 
-  const renderEpisodeCard = ({ item }: { item: typeof episodes[0] }) => (
-    <TouchableOpacity style={styles.episodeCard}>
-      <View style={styles.episodeHeader}>
-        <View style={styles.episodeTitleContainer}>
-          <Text style={[styles.episodeTitle, { color: '#000000' }]} numberOfLines={2}>
-            {item.title}
-          </Text>
-          <View style={styles.episodeMetaBadges}>
-            <View style={[styles.badge, { backgroundColor: colors.primary + '20' }]}>
-              <Feather name="file-video" size={12} color={colors.primary} />
-              <Text style={[styles.badgeText, { color: colors.primary }]}>
-                {formatFileSize(item.size)}
+      setSelectedEpisodeForGeneration(episodeId);
+      setGenerationModalVisible(true);
+
+      try {
+        // Read subtitle file
+        const subtitleContent = await FileSystem.readAsStringAsync(episode.subtitleUri);
+
+        // Determine subtitle format
+        const subtitleFormat = episode.subtitleUri.includes('.vtt') ? 'vtt' : 'srt';
+
+        // Get OpenAI key if available (optional)
+        const openaiKey = process.env.EXPO_PUBLIC_OPENAI_KEY;
+
+        // Generate flashcards
+        const success = await generation.generateFromSubtitle(
+          episodeId,
+          subtitleContent,
+          subtitleFormat,
+          openaiKey
+        );
+
+        if (success && generation.result) {
+          Alert.alert(
+            'Success!',
+            `Created ${generation.result.flashcards} flashcards!\n\nGo to Study tab to see them.`,
+            [
+              {
+                text: 'View in Study',
+                onPress: () => {
+                  setGenerationModalVisible(false);
+                  router.push('/(tabs)/study');
+                },
+              },
+              { text: 'OK', onPress: () => setGenerationModalVisible(false) },
+            ]
+          );
+        } else {
+          Alert.alert('Error', generation.error || 'Failed to generate flashcards');
+          setGenerationModalVisible(false);
+        }
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+        Alert.alert('Error', `Failed to read subtitles: ${errorMessage}`);
+        setGenerationModalVisible(false);
+      }
+    },
+    [episodes, generation, router]
+  );
+  <TouchableOpacity style={styles.episodeCard}>
+    <View style={styles.episodeHeader}>
+      <View style={styles.episodeTitleContainer}>
+        <Text style={[styles.episodeTitle, { color: '#000000' }]} numberOfLines={2}>
+          {item.title}
+        </Text>
+        <View style={styles.episodeMetaBadges}>
+          <View style={[styles.badge, { backgroundColor: colors.primary + '20' }]}>
+            <Feather name="file-video" size={12} color={colors.primary} />
+            <Text style={[styles.badgeText, { color: colors.primary }]}>
+              {formatFileSize(item.size)}
+            </Text>
+          </View>
+          {item.subtitles && (
+            <View style={[styles.badge, { backgroundColor: '#7FE5DE' + '20' }]}>
+              <Feather name="book" size={12} color="#7FE5DE" />
+              <Text style={[styles.badgeText, { color: '#7FE5DE' }]}>
+                {item.subtitles.length} subtitles
               </Text>
             </View>
-            {item.subtitles && (
-              <View style={[styles.badge, { backgroundColor: '#7FE5DE' + '20' }]}>
-                <Feather name="book" size={12} color="#7FE5DE" />
-                <Text style={[styles.badgeText, { color: '#7FE5DE' }]}>
-                  {item.subtitles.length} subtitles
-                </Text>
-              </View>
-            )}
-          </View>
-        </View>
-        <View
-          style={[
-            styles.statusBadge,
-            { backgroundColor: getStatusColor(item.processingStatus) },
-          ]}
-        >
-          <MaterialIcons
-            name={getStatusIcon(item.processingStatus) as any}
-            size={16}
-            color="#000"
-          />
+          )}
         </View>
       </View>
-
-      <View style={styles.episodeDetails}>
-        <View style={styles.detailRow}>
-          <Feather name="calendar" size={14} color="#666666" />
-          <Text style={[styles.detailText, { color: '#666666' }]}>
-            {new Date(item.uploadedAt).toLocaleDateString()}
-          </Text>
-        </View>
+      <View
+        style={[
+          styles.statusBadge,
+          { backgroundColor: getStatusColor(item.processingStatus) },
+        ]}
+      >
+        <MaterialIcons
+          name={getStatusIcon(item.processingStatus) as any}
+          size={16}
+          color="#000"
+        />
       </View>
+    </View>
 
-      <View style={styles.episodeActions}>
+    <View style={styles.episodeDetails}>
+      <View style={styles.detailRow}>
+        <Feather name="calendar" size={14} color="#666666" />
+        <Text style={[styles.detailText, { color: '#666666' }]}>
+          {new Date(item.uploadedAt).toLocaleDateString()}
+        </Text>
+      </View>
+    </View>
+
+    <View style={styles.episodeActions}>
+      <TouchableOpacity
+        style={[styles.actionBtn, { backgroundColor: colors.primary + '20' }]}
+        onPress={() => {
+          console.log('Playing episode:', item.id);
+          router.push({
+            pathname: '/player',
+            params: { episodeId: item.id }
+          });
+        }}
+      >
+        <Feather name="play" size={16} color={colors.primary} />
+        <Text style={[styles.actionBtnText, { color: colors.primary }]}>Watch</Text>
+      </TouchableOpacity>
+      {item.subtitles && item.subtitles.length > 0 ? (
         <TouchableOpacity
-          style={[styles.actionBtn, { backgroundColor: colors.primary + '20' }]}
+          style={[styles.actionBtn, { backgroundColor: '#7FE5DE' + '20' }]}
           onPress={() => {
-            console.log('Playing episode:', item.id);
-            router.push({
-              pathname: '/player',
-              params: { episodeId: item.id }
-            });
+            Alert.alert(
+              'Subtitles',
+              `${item.subtitles.length} subtitles loaded`,
+              [
+                {
+                  text: 'Change',
+                  onPress: () => handleAddSubtitle(item.id),
+                },
+                {
+                  text: 'Cancel',
+                  onPress: () => { },
+                  style: 'cancel',
+                },
+              ]
+            );
           }}
         >
-          <Feather name="play" size={16} color={colors.primary} />
-          <Text style={[styles.actionBtnText, { color: colors.primary }]}>Watch</Text>
+          <Feather name="check-circle" size={16} color="#7FE5DE" />
+          <Text style={[styles.actionBtnText, { color: '#7FE5DE' }]}>Subtitle</Text>
         </TouchableOpacity>
-        {item.subtitles && item.subtitles.length > 0 ? (
-          <TouchableOpacity
-       style={[styles.actionBtn, { backgroundColor: '#7FE5DE' + '20' }]}
-       onPress={() => {
-         Alert.alert(
-           'Subtitles',
-           `${item.subtitles.length} subtitles loaded`,
-           [
-             {
-               text: 'Change',
-               onPress: () => handleAddSubtitle(item.id),
-             },
-             {
-               text: 'Cancel',
-               onPress: () => {},
-               style: 'cancel',
-             },
-           ]
-         );
-       }}
-     >
-       <Feather name="check-circle" size={16} color="#7FE5DE" />
-       <Text style={[styles.actionBtnText, { color: '#7FE5DE' }]}>Subtitle</Text>
-     </TouchableOpacity>
-        ) : (
-          <TouchableOpacity
-            style={[styles.actionBtn, { backgroundColor: '#FFD700' + '20' }]}
-            onPress={() => handleAddSubtitle(item.id)}
-          >
-            <Feather name="plus-circle" size={16} color="#FFD700" />
-            <Text style={[styles.actionBtnText, { color: '#FFD700' }]}>Add</Text>
-          </TouchableOpacity>
-        )}
+      ) : (
         <TouchableOpacity
-          style={[styles.actionBtn, { backgroundColor: '#FF9999' + '20' }]}
-          onPress={() => handleDelete(item.id)}
+          style={[styles.actionBtn, { backgroundColor: '#FFD700' + '20' }]}
+          onPress={() => handleAddSubtitle(item.id)}
         >
-          <Feather name="trash-2" size={16} color="#FF9999" />
+          <Feather name="plus-circle" size={16} color="#FFD700" />
+          <Text style={[styles.actionBtnText, { color: '#FFD700' }]}>Add</Text>
         </TouchableOpacity>
-      </View>
-    </TouchableOpacity>
+      )}
+      {item.subtitleUri && (
+        <TouchableOpacity
+          style={[styles.actionBtn, { backgroundColor: '#A8E6CF' + '20' }]}
+          onPress={() => handleGenerateFlashcards(item.id)}
+        >
+          <Feather name="zap" size={16} color="#A8E6CF" />
+          <Text style={[styles.actionBtnText, { color: '#A8E6CF' }]}>Gen</Text>
+        </TouchableOpacity>
+      )}
+      <TouchableOpacity
+        style={[styles.actionBtn, { backgroundColor: '#FF9999' + '20' }]}
+        onPress={() => handleDelete(item.id)}
+      >
+        <Feather name="trash-2" size={16} color="#FF9999" />
+      </TouchableOpacity>
+    </View>
+  </TouchableOpacity>
   );
 
   return (
@@ -325,6 +393,77 @@ export default function LibraryScreen() {
           </RetroWindow>
         )}
       </ScrollView>
+
+      {/* Generation Progress Modal */}
+      <Modal
+        visible={generationModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => {
+          if (!generation.loading) {
+            setGenerationModalVisible(false);
+          }
+        }}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.generationModal, { backgroundColor: colors.retroBg }]}>
+            <Text style={[styles.modalTitle, { color: '#000000' }]}>
+              Generating Flashcards
+            </Text>
+
+            {generation.error ? (
+              <>
+                <Text style={[styles.errorText, { color: '#FF6B6B' }]}>
+                  {generation.error}
+                </Text>
+                <TouchableOpacity
+                  style={[styles.closeButton, { backgroundColor: colors.primary }]}
+                  onPress={() => {
+                    setGenerationModalVisible(false);
+                    generation.reset();
+                  }}
+                >
+                  <Text style={{ color: '#FFF', fontWeight: '600' }}>Close</Text>
+                </TouchableOpacity>
+              </>
+            ) : (
+              <>
+                <Text style={[styles.statusText, { color: '#666666' }]}>
+                  {generation.status}
+                </Text>
+                {generation.progress > 0 && generation.progress < 100 && (
+                  <>
+                    <View style={styles.progressBar}>
+                      <View
+                        style={[
+                          styles.progressFill,
+                          {
+                            width: `${generation.progress}%`,
+                            backgroundColor: colors.primary,
+                          },
+                        ]}
+                      />
+                    </View>
+                    <Text style={[styles.progressText, { color: '#999999' }]}>
+                      {generation.progress}%
+                    </Text>
+                  </>
+                )}
+                {generation.progress === 100 && generation.result && (
+                  <View style={styles.resultContainer}>
+                    <Text style={[styles.resultText, { color: colors.primary }]}>
+                      ✅ Created {generation.result.flashcards} flashcards!
+                    </Text>
+                  </View>
+                )}
+                {generation.loading && (
+                  <ActivityIndicator size="large" color={colors.primary} />
+                )}
+              </>
+            )}
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -509,5 +648,66 @@ const styles = StyleSheet.create({
     fontFamily: Fonts.sans,
     marginTop: 12,
     textAlign: 'center',
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  generationModal: {
+    borderRadius: 16,
+    padding: 24,
+    width: '80%',
+    maxWidth: 400,
+    borderWidth: 2,
+    borderColor: '#E0E0E0',
+    gap: 16,
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    textAlign: 'center',
+    fontFamily: Fonts.rounded,
+  },
+  statusText: {
+    fontSize: 14,
+    textAlign: 'center',
+    fontFamily: Fonts.sans,
+  },
+  errorText: {
+    fontSize: 14,
+    textAlign: 'center',
+    fontFamily: Fonts.sans,
+  },
+  progressBar: {
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: '#E0E0E0',
+    overflow: 'hidden',
+    marginVertical: 8,
+  },
+  progressFill: {
+    height: '100%',
+    borderRadius: 3,
+  },
+  progressText: {
+    fontSize: 12,
+    textAlign: 'center',
+    fontFamily: Fonts.sans,
+  },
+  resultContainer: {
+    alignItems: 'center',
+    paddingVertical: 12,
+  },
+  resultText: {
+    fontSize: 16,
+    fontWeight: '600',
+    fontFamily: Fonts.sans,
+  },
+  closeButton: {
+    paddingVertical: 12,
+    borderRadius: 8,
+    alignItems: 'center',
   },
 });
