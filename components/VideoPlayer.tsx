@@ -1,4 +1,4 @@
-// components/VideoPlayer.tsx - IMPROVED VERSION
+// components/VideoPlayer.tsx - FIXED UI LAYOUT
 import { getSubtitleAtTime, Subtitle } from '@/utils/subtitleParser';
 import { Ionicons } from '@expo/vector-icons';
 import { useEvent, useEventListener } from 'expo';
@@ -222,76 +222,59 @@ useEventListener(player, 'timeUpdate', (event) => {
     const r = s % 60;
     return `${m}:${r.toString().padStart(2, '0')}`;
   };
-// console.log('DRAG STATUS:', isDragging.current);
-// console.log('TIME SYNC:', currentTime, '/', duration);
-
-
-
   return (
     <View style={styles.container}>
-      <VideoView player={player} style={styles.video} nativeControls={false} surfaceType="textureView" />
+      <VideoView 
+        player={player} 
+        style={styles.video} 
+        nativeControls={false} 
+        contentFit="contain"
+      />
 
       <View style={styles.overlay}>
+        {/* Top Bar */}
         <View style={styles.topBar}>
           <TouchableOpacity onPress={onBack}>
             <Ionicons name="arrow-back" size={28} color="white" />
           </TouchableOpacity>
-          <Text style={styles.title}>{title}</Text>
+          <Text style={styles.title} numberOfLines={1}>{title}</Text>
+          <TouchableOpacity onPress={toggleRotation}>
+            <Ionicons 
+              name={isLandscape ? "contract-outline" : "expand-outline"} 
+              size={24} 
+              color="white" 
+            />
+          </TouchableOpacity>
         </View>
 
-        {/* Subtitle Display - IMPROVED VISIBILITY */}
-        {currentSubtitle && (
+        {/* FIXED: Subtitle Display - Positioned higher, smaller text */}
+        {currentSubtitle ? (
           <View style={styles.subtitleWrapper}>
-            <View style={[styles.subtitleContainer, { backgroundColor: 'rgba(0,0,0,0.7)' }]}> 
+            <View style={styles.subtitleContainer}>
               <Text 
-                style={[
-                  styles.subtitleText,
-                  {
-                    color: '#FFEB3B', // Bright yellow for visibility
-                    fontSize: 28,
-                    textShadowColor: '#000',
-                    textShadowOffset: { width: 2, height: 2 },
-                    textShadowRadius: 4,
-                  },
-                ]}
+                style={styles.subtitleText}
                 numberOfLines={0}
               >
                 {currentSubtitle.text}
               </Text>
             </View>
           </View>
-        )}
-
-
-        {/* Debug indicator when no subtitles are available */}
-        {subtitles.length === 0 && (
-          <View style={styles.subtitleWrapper}>
-            <View style={[styles.subtitleContainer, { backgroundColor: 'rgba(255, 0, 0, 0.8)' }]}>
-              <Text style={styles.subtitleText}>⚠️ No subtitles loaded</Text>
+        ) : (
+          // Debug indicator when no subtitle is active
+          subtitles.length > 0 && __DEV__ && (
+            <View style={styles.subtitleWrapper}>
+              <View style={[styles.subtitleContainer, { backgroundColor: 'rgba(0, 0, 0, 0.3)' }]}>
+                <Text style={[styles.subtitleText, { fontSize: 10, fontStyle: 'italic' }]}>
+                  {`Waiting... (${subtitles.length} available)`}
+                </Text>
+              </View>
             </View>
-          </View>
+          )
         )}
 
+        {/* FIXED: Bottom Controls - Compact layout */}
         <View style={styles.bottomBar}>
-          <View style={styles.controlsContainer}>
-            <View style={styles.centerRow}>
-              <TouchableOpacity onPress={() => handleSkip(-10)} style={styles.smallBtn}>
-                <Ionicons name="play-back" size={24} color="white" />
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                onPress={() => isPlaying ? player.pause() : player.play()}
-                style={styles.smallPlayBtn}
-              >
-                <Ionicons name={isPlaying ? "pause" : "play"} size={32} color="white" />
-              </TouchableOpacity>
-
-              <TouchableOpacity onPress={() => handleSkip(10)} style={styles.smallBtn}>
-                <Ionicons name="play-forward" size={24} color="white" />
-              </TouchableOpacity>
-            </View>
-          </View>
-
+          {/* Progress Bar First */}
           <View
             style={styles.sliderWrapper}
             {...panResponder.panHandlers}
@@ -313,11 +296,30 @@ useEventListener(player, 'timeUpdate', (event) => {
             </View>
           </View>
 
-          <View style={styles.timeRow}>
+          {/* Time and Controls Row */}
+          <View style={styles.bottomRow}>
+            {/* Time Display */}
             <Text style={styles.time}>{formatTime(currentTime)}</Text>
-            <TouchableOpacity onPress={toggleRotation} style={styles.fullscreenBtn}>
-              <Ionicons name={isLandscape ? "contract-outline" : "expand-outline"} size={20} color="white" />
-            </TouchableOpacity>
+
+            {/* Playback Controls */}
+            <View style={styles.centerRow}>
+              <TouchableOpacity onPress={() => handleSkip(-10)} style={styles.smallBtn}>
+                <Ionicons name="play-back" size={20} color="white" />
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                onPress={() => isPlaying ? player.pause() : player.play()}
+                style={styles.playBtn}
+              >
+                <Ionicons name={isPlaying ? "pause" : "play"} size={24} color="white" />
+              </TouchableOpacity>
+
+              <TouchableOpacity onPress={() => handleSkip(10)} style={styles.smallBtn}>
+                <Ionicons name="play-forward" size={20} color="white" />
+              </TouchableOpacity>
+            </View>
+
+            {/* Duration */}
             <Text style={styles.time}>{formatTime(duration)}</Text>
           </View>
         </View>
@@ -327,11 +329,16 @@ useEventListener(player, 'timeUpdate', (event) => {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#000' },
-  video: { flex: 1 },
+  container: { 
+    flex: 1, 
+    backgroundColor: '#000' 
+  },
+  video: { 
+    flex: 1 
+  },
   overlay: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0,0,0,0.3)',
+    backgroundColor: 'rgba(0,0,0,0.2)',
     justifyContent: 'space-between',
     paddingVertical: 0
   },
@@ -340,7 +347,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingTop: 50,
-    paddingHorizontal: 20
+    paddingHorizontal: 20,
+    paddingBottom: 10,
   },
   title: {
     color: 'white',
@@ -349,25 +357,48 @@ const styles = StyleSheet.create({
     flex: 1,
     marginHorizontal: 12
   },
-  rotationBtn: { padding: 8 },
-  bottomBar: { paddingHorizontal: 20, paddingBottom: 20 },
-  controlsContainer: { marginBottom: 12 },
-  centerRow: {
-    flexDirection: 'row',
-    justifyContent: 'center',
+  
+  // FIXED: Subtitle positioning - higher up, no overlap with controls
+  subtitleWrapper: {
+    position: 'absolute',
+    bottom: 100, // Moved up from 120
+    left: 0,
+    right: 0,
     alignItems: 'center',
-    gap: 16
-  },
-  smallPlayBtn: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: 'rgba(255,255,255,0.2)',
     justifyContent: 'center',
-    alignItems: 'center'
+    zIndex: 100,
+    pointerEvents: 'none',
+    paddingHorizontal: 20,
   },
-  smallBtn: { padding: 8 },
-  sliderWrapper: { height: 40, justifyContent: 'center', marginVertical: 8 },
+  subtitleContainer: {
+    backgroundColor: 'rgba(0, 0, 0, 0.85)',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 6,
+    maxWidth: '90%',
+    alignItems: 'center',
+  },
+  subtitleText: {
+    color: '#FFFFFF',
+    fontSize: 16, // Reduced from 18-28
+    fontWeight: '600',
+    textAlign: 'center',
+    lineHeight: 22,
+    textShadowColor: '#000000',
+    textShadowOffset: { width: 1, height: 1 },
+    textShadowRadius: 2,
+  },
+  
+  // FIXED: Bottom controls - compact and organized
+  bottomBar: { 
+    paddingHorizontal: 20, 
+    paddingBottom: 20 
+  },
+  sliderWrapper: { 
+    height: 32, 
+    justifyContent: 'center', 
+    marginBottom: 8 
+  },
   track: {
     height: 4,
     backgroundColor: 'rgba(255,255,255,0.3)',
@@ -381,55 +412,41 @@ const styles = StyleSheet.create({
   },
   knob: {
     position: 'absolute',
-    width: 16,
-    height: 16,
-    borderRadius: 8,
+    width: 14,
+    height: 14,
+    borderRadius: 7,
     backgroundColor: '#FFB6D9',
-    top: -6,
-    marginLeft: -8
+    top: -5,
+    marginLeft: -7
   },
-  timeRow: {
+  
+  // NEW: Combined bottom row with time, controls, and duration
+  bottomRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginTop: 8
   },
-  time: { color: 'white', fontSize: 12 },
-  fullscreenBtn: {
-    padding: 8,
-    alignItems: 'center',
-    justifyContent: 'center'
-  },
-  subtitleWrapper: {
-    position: 'absolute',
-    bottom: 120,
-    left: 0,
-    right: 0,
-    alignItems: 'center',
+  centerRow: {
+    flexDirection: 'row',
     justifyContent: 'center',
-    zIndex: 100,
-    pointerEvents: 'none',
-    paddingHorizontal: 12,
-  },
-  subtitleContainer: {
     alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    maxWidth: '95%',
+    gap: 12
   },
-  subtitleText: {
-    color: 'white',
-    fontSize: 18,
-    fontWeight: '500',
-    backgroundColor: 'rgba(0,0,0,0.85)',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 4,
-    textAlign: 'center',
-    textShadowColor: '#000000',
-    textShadowOffset: { width: 0, height: 0 },
-    textShadowRadius: 2,
-    lineHeight: 24,
+  playBtn: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: 'rgba(255,255,255,0.25)',
+    justifyContent: 'center',
+    alignItems: 'center'
+  },
+  smallBtn: { 
+    padding: 8 
+  },
+  time: { 
+    color: 'white', 
+    fontSize: 13,
+    fontWeight: '600',
+    minWidth: 45,
   },
 });
