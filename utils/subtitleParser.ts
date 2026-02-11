@@ -1,5 +1,6 @@
 /**
- * Parse SRT and VTT subtitle files
+ * IMPROVED Subtitle Parser with Better Japanese Support
+ * Parse SRT, VTT, and ASS subtitle files
  */
 
 export interface Subtitle {
@@ -21,14 +22,24 @@ export interface ParsedSubtitles {
  * Convert time string "00:00:05.000" to milliseconds
  */
 function timeStringToMs(timeStr: string): number {
-  const parts = timeStr.split(':');
-  const hours = parseInt(parts[0], 10);
-  const minutes = parseInt(parts[1], 10);
-  const secondsAndMs = parts[2].split('.');
-  const seconds = parseInt(secondsAndMs[0], 10);
-  const ms = parseInt((secondsAndMs[1] || '0').padEnd(3, '0'), 10);
+  try {
+    const parts = timeStr.split(':');
+    if (parts.length !== 3) {
+      console.error(`[timeStringToMs] Invalid time format: ${timeStr}`);
+      return 0;
+    }
+    
+    const hours = parseInt(parts[0], 10) || 0;
+    const minutes = parseInt(parts[1], 10) || 0;
+    const secondsAndMs = parts[2].split('.');
+    const seconds = parseInt(secondsAndMs[0], 10) || 0;
+    const ms = parseInt((secondsAndMs[1] || '0').padEnd(3, '0'), 10) || 0;
 
-  return hours * 3600000 + minutes * 60000 + seconds * 1000 + ms;
+    return hours * 3600000 + minutes * 60000 + seconds * 1000 + ms;
+  } catch (error) {
+    console.error(`[timeStringToMs] Error parsing time: ${timeStr}`, error);
+    return 0;
+  }
 }
 
 /**
@@ -49,69 +60,107 @@ function msToTimeString(ms: number): string {
 }
 
 /**
- * Parse SRT format subtitles
- * Format:
- * 1
- * 00:00:05,000 --> 00:00:10,000
- * Subtitle text here
+ * IMPROVED SRT Parser with Better Japanese Handling
  */
 function parseSRT(content: string): Subtitle[] {
   const subtitles: Subtitle[] = [];
-  const blocks = content.split('\n\n').filter((block) => block.trim());
+  
+  // Normalize line endings and remove BOM
+  const normalizedContent = content
+    .replace(/^\uFEFF/, '') // Remove BOM
+    .replace(/\r\n/g, '\n')  // Normalize to Unix line endings
+    .replace(/\r/g, '\n');   // Handle old Mac line endings
+  
+  // Split by double newlines (blank lines separate subtitle blocks)
+  const blocks = normalizedContent
+    .split(/\n\s*\n/)
+    .filter((block) => block.trim());
+
+  console.log(`[SRT Parser] Found ${blocks.length} subtitle blocks`);
 
   blocks.forEach((block, blockIndex) => {
-    const lines = block.trim().split('\n');
-
-    // Find the timing line (contains -->)
-    let timingLineIndex = -1;
-    for (let i = 0; i < lines.length; i++) {
-      if (lines[i].includes('-->')) {
-        timingLineIndex = i;
-        break;
+    try {
+      const lines = block.trim().split('\n');
+      
+      // Find the timing line (contains -->)
+      let timingLineIndex = -1;
+      for (let i = 0; i < lines.length; i++) {
+        if (lines[i].includes('-->')) {
+          timingLineIndex = i;
+          break;
+        }
       }
-    }
 
-    if (timingLineIndex === -1) return;
+      if (timingLineIndex === -1) {
+        return; // Skip this block
+      }
 
-    const timingLine = lines[timingLineIndex];
-    const [startTimeStr, endTimeStr] = timingLine.split('-->').map((t) => t.trim());
+      const timingLine = lines[timingLineIndex];
+      const [startTimeStr, endTimeStr] = timingLine.split('-->').map((t) => t.trim());
 
-    // Convert comma to dot for milliseconds
-    const startTimeFormatted = startTimeStr.replace(',', '.');
-    const endTimeFormatted = endTimeStr.replace(',', '.');
+      // Convert comma to dot for milliseconds (SRT uses comma)
+      const startTimeFormatted = startTimeStr.replace(',', '.');
+      const endTimeFormatted = endTimeStr.replace(',', '.');
 
-    // Get text content and preserve it without aggressive trimming
-    const textLines = lines.slice(timingLineIndex + 1);
-    const text = textLines.join('\n').trim();
+      // Get text content - everything after the timing line
+      const textLines = lines.slice(timingLineIndex + 1);
+      
+      // Clean and join text
+      let text = textLines
+        .filter(line => line.trim()) // Remove empty lines
+        .join('\n')
+        .trim();
 
-    // Log if Japanese characters detected for debugging
-    if (text && /[\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FFF]/.test(text)) {
-      console.log(`[SRT] Japanese subtitle detected at index ${blockIndex + 1}: ${text.substring(0, 50)}`);
-    }
+      // Clean up common subtitle artifacts
+      text = text
+        .replace(/\[\[/g, '(') // Replace [[ with (
+        .replace(/\]\]/g, ')') // Replace ]] with )
+        .replace(/\(([ﾊﾟｿｺﾝ])\)/g, '') // Remove (パソコン) style notes
+        .replace(/（([^）]*)）/g, '') // Remove full-width parenthetical notes
+        .trim();
 
-    if (text) {
+      if (!text) {
+        return; // Skip empty subtitles
+      }
+
+      // Parse times
+      const startMs = timeStringToMs(startTimeFormatted);
+      const endMs = timeStringToMs(endTimeFormatted);
+
+      if (isNaN(startMs) || isNaN(endMs) || startMs < 0 || endMs < 0) {
+        console.warn(`[SRT] Invalid time in block ${blockIndex + 1}: ${startTimeFormatted} --> ${endTimeFormatted}`);
+        return;
+      }
+
+      // Debug log for Japanese content
+      const hasJapanese = /[\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FFF]/.test(text);
+      if (hasJapanese && blockIndex < 5) {
+        console.log(`[SRT] Japanese subtitle #${blockIndex + 1}: "${text.substring(0, 60)}" (${startMs}ms - ${endMs}ms)`);
+      }
+
       subtitles.push({
         index: blockIndex + 1,
-        startTime: timeStringToMs(startTimeFormatted),
-        endTime: timeStringToMs(endTimeFormatted),
+        startTime: startMs,
+        endTime: endMs,
         text,
         startTimeStr: startTimeFormatted,
         endTimeStr: endTimeFormatted,
       });
+    } catch (error) {
+      console.error(`[SRT] Error parsing block ${blockIndex + 1}:`, error);
     }
   });
 
-  console.log(`[SRT Parser] Parsed ${subtitles.length} subtitles total`);
+  console.log(`[SRT Parser] Successfully parsed ${subtitles.length} subtitles`);
+  if (subtitles.length > 0) {
+    console.log(`[SRT Parser] Time range: ${subtitles[0].startTime}ms to ${subtitles[subtitles.length - 1].endTime}ms`);
+  }
+  
   return subtitles;
 }
 
 /**
  * Parse ASS/SSA format subtitles
- * Format (ASS/SSA):
- * [Events]
- * Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
- * Dialogue: 0,0:00:05.00,0:00:10.00,Default,,0,0,0,,Japanese text here
- * Time format: H:MM:SS.CC (centiseconds)
  */
 function parseASS(content: string): Subtitle[] {
   const subtitles: Subtitle[] = [];
@@ -120,7 +169,6 @@ function parseASS(content: string): Subtitle[] {
   let inEventsSection = false;
   let subtitleIndex = 0;
 
-  // Find Events section and parse
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i].trim();
 
@@ -129,38 +177,26 @@ function parseASS(content: string): Subtitle[] {
       continue;
     }
 
-    // Stop if we hit another section
     if (line.startsWith('[') && line.endsWith(']') && inEventsSection) {
       break;
     }
 
-    // Parse Dialogue lines
     if (inEventsSection && line.startsWith('Dialogue:')) {
       try {
-        // Remove 'Dialogue: ' prefix
         const dialogueData = line.substring(9);
-
-        // Split by comma, but be careful because Text field can contain commas
-        // Format: Layer,Start,End,Style,Name,MarginL,MarginR,MarginV,Effect,Text
         const parts = dialogueData.split(',');
 
         if (parts.length < 10) continue;
 
         const startTimeStr = parts[1].trim();
         const endTimeStr = parts[2].trim();
-        const text = parts.slice(9).join(',').trim(); // Text field is after Effect
+        const text = parts.slice(9).join(',').trim();
 
-        // Remove ASS styling tags (like {\an8}, {\c&H...&})
+        // Remove ASS styling tags
         const cleanText = text.replace(/\{[^}]*\}/g, '').trim();
 
         if (!cleanText) continue;
 
-        // Log if Japanese characters detected for debugging
-        if (/[\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FFF]/.test(cleanText)) {
-          console.log(`[ASS] Japanese subtitle detected at index ${subtitleIndex + 1}: ${cleanText.substring(0, 50)}`);
-        }
-
-        // Convert ASS time format (H:MM:SS.CC) to milliseconds
         const startMs = assTimeToMs(startTimeStr);
         const endMs = assTimeToMs(endTimeStr);
 
@@ -174,12 +210,12 @@ function parseASS(content: string): Subtitle[] {
           endTimeStr,
         });
       } catch (err) {
-        console.warn('Failed to parse ASS line:', line, err);
+        console.warn('Failed to parse ASS line:', err);
       }
     }
   }
 
-  console.log(`[ASS Parser] Parsed ${subtitles.length} subtitles total`);
+  console.log(`[ASS Parser] Parsed ${subtitles.length} subtitles`);
   return subtitles;
 }
 
@@ -201,11 +237,6 @@ function assTimeToMs(timeStr: string): number {
 
 /**
  * Parse VTT format subtitles
- * Format:
- * WEBVTT
- *
- * 00:00:05.000 --> 00:00:10.000
- * Subtitle text here
  */
 function parseVTT(content: string): Subtitle[] {
   const subtitles: Subtitle[] = [];
@@ -214,7 +245,7 @@ function parseVTT(content: string): Subtitle[] {
   let i = 0;
   let subtitleIndex = 0;
 
-  // Skip WEBVTT header and metadata
+  // Skip WEBVTT header
   while (i < lines.length && !lines[i].includes('-->')) {
     i++;
   }
@@ -225,7 +256,6 @@ function parseVTT(content: string): Subtitle[] {
     if (line.includes('-->')) {
       const [startTimeStr, endTimeStr] = line.split('-->').map((t) => t.trim());
 
-      // Collect text lines
       const text: string[] = [];
       i++;
 
@@ -235,19 +265,12 @@ function parseVTT(content: string): Subtitle[] {
       }
 
       if (text.length > 0) {
-        const fullText = text.join('\n');
-        
-        // Log if Japanese characters detected for debugging
-        if (/[\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FFF]/.test(fullText)) {
-          console.log(`[VTT] Japanese subtitle detected at index ${subtitleIndex + 1}: ${fullText.substring(0, 50)}`);
-        }
-        
         subtitleIndex++;
         subtitles.push({
           index: subtitleIndex,
           startTime: timeStringToMs(startTimeStr),
           endTime: timeStringToMs(endTimeStr),
-          text: fullText,
+          text: text.join('\n'),
           startTimeStr,
           endTimeStr,
         });
@@ -257,16 +280,15 @@ function parseVTT(content: string): Subtitle[] {
     }
   }
 
-  console.log(`[VTT Parser] Parsed ${subtitles.length} subtitles total`);
+  console.log(`[VTT Parser] Parsed ${subtitles.length} subtitles`);
   return subtitles;
 }
 
 /**
- * Detect subtitle format and parse accordingly
+ * Main parse function - detects format and parses
  */
 export function parseSubtitles(content: string): ParsedSubtitles {
-  console.log('[parseSubtitles] Input content length:', content.length);
-  console.log('[parseSubtitles] First 200 chars:', content.substring(0, 200));
+  console.log('[parseSubtitles] Starting parse, content length:', content.length);
   
   let format: 'srt' | 'vtt' | 'ass';
   let subtitles: Subtitle[];
@@ -275,17 +297,18 @@ export function parseSubtitles(content: string): ParsedSubtitles {
     format = 'ass';
     console.log('[parseSubtitles] Detected ASS format');
     subtitles = parseASS(content);
-  } else if (content.includes('WEBVTT')) {
+  } else if (content.toUpperCase().includes('WEBVTT')) {
     format = 'vtt';
     console.log('[parseSubtitles] Detected VTT format');
     subtitles = parseVTT(content);
   } else {
     format = 'srt';
-    console.log('[parseSubtitles] Detected SRT format');
+    console.log('[parseSubtitles] Detected SRT format (default)');
     subtitles = parseSRT(content);
   }
 
-  console.log(`[parseSubtitles] Returning ${subtitles.length} subtitles in ${format} format`);
+  console.log(`[parseSubtitles] Parsed ${subtitles.length} subtitles in ${format.toUpperCase()} format`);
+  
   return {
     format,
     subtitles,
@@ -294,26 +317,33 @@ export function parseSubtitles(content: string): ParsedSubtitles {
 }
 
 /**
- * Get subtitle at current timestamp
+ * IMPROVED: Get subtitle at current timestamp with tolerance
  */
 export function getSubtitleAtTime(subtitles: Subtitle[], timeMs: number): Subtitle | null {
-  if (!subtitles || !Array.isArray(subtitles)) return null;
+  if (!subtitles || !Array.isArray(subtitles) || subtitles.length === 0) {
+    return null;
+  }
+
+  // Add small tolerance (100ms) for subtitle matching
+  const tolerance = 100;
   
-  return subtitles.find((sub) => {
-    // Force conversion to numbers just in case storage turned them into strings
+  // Find subtitle that matches current time
+  const subtitle = subtitles.find((sub) => {
     const start = Number(sub.startTime);
     const end = Number(sub.endTime);
-    return timeMs >= start && timeMs <= end;
-  }) || null;
+    
+    // Check if time falls within subtitle range (with tolerance)
+    return timeMs >= (start - tolerance) && timeMs <= (end + tolerance);
+  });
+
+  return subtitle || null;
 }
 
 /**
  * Extract all Japanese words from subtitle text
- * Simple regex-based extraction (not perfect, but functional)
  */
 export function extractJapaneseWords(text: string): string[] {
-  // Match Hiragana, Katakana, and Kanji
   const japaneseRegex = /[\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FFF]+/g;
   const matches = text.match(japaneseRegex) || [];
-  return [...new Set(matches)]; // Remove duplicates
+  return [...new Set(matches)];
 }
