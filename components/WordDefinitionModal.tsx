@@ -124,15 +124,6 @@ export default function WordDefinitionModal({
                     <Text style={styles.badgeText}>{definition.partOfSpeech}</Text>
                   </View>
                 </View>
-
-                {/* Example Sentence */}
-                <View style={styles.section}>
-                  <Text style={styles.label}>Example</Text>
-                  <TappableText 
-                    text={definition.exampleSentence}
-                    onWordPress={onWordPress}
-                  />
-                </View>
               </>
             ) : (
               <View style={styles.noDefinition}>

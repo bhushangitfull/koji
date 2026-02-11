@@ -1,4 +1,5 @@
 // components/VideoPlayer.tsx - FIXED UI LAYOUT
+import { getJishoDefinition } from '@/utils/flashcardGenerator';
 import { getSubtitleAtTime, Subtitle } from '@/utils/subtitleParser';
 import { Ionicons } from '@expo/vector-icons';
 import { useEvent, useEventListener } from 'expo';
@@ -11,11 +12,11 @@ import {
   StyleSheet,
   Text,
   TouchableOpacity,
-  View,
-  Pressable,
+  View
 } from 'react-native';
-import WordDefinitionModal, { WordDefinition } from './WordDefinitionModal';
-import { getJishoDefinition } from '@/utils/flashcardGenerator';
+import SubtitleSelectionModal from './SubtitleSelectionModel';
+// import { WordDefinition } from './WordDefinitionModal';
+
 
 const { width: windowWidth } = Dimensions.get('window');
 
@@ -32,6 +33,8 @@ export default function CustomPlayer({ videoUri, title, subtitles = [], onBack }
   const [selectedWord, setSelectedWord] = useState<string | null>(null);
   const [selectedDefinition, setSelectedDefinition] = useState<WordDefinition | null | undefined>(undefined);
   const [definitionModalVisible, setDefinitionModalVisible] = useState(false);
+  const [subtitleModalVisible, setSubtitleModalVisible] = useState(false);
+  const [selectedSubtitleText, setSelectedSubtitleText] = useState<string>('');
 
   // DEBUG: Log first subtitle text before render
   useEffect(() => {
@@ -56,13 +59,13 @@ export default function CustomPlayer({ videoUri, title, subtitles = [], onBack }
 
   const { status } = useEvent(player, 'statusChange', { status: player.status });
 
-useEffect(() => {
-  // Frequently, player.duration isn't ready at mount. 
-  // This watcher catches it when the video metadata loads.
-  if (player.duration > 0 && duration === 0) {
-    setDuration(player.duration);
-  }
-}, [player.duration, duration]);
+  useEffect(() => {
+    // Frequently, player.duration isn't ready at mount. 
+    // This watcher catches it when the video metadata loads.
+    if (player.duration > 0 && duration === 0) {
+      setDuration(player.duration);
+    }
+  }, [player.duration, duration]);
 
   // CRITICAL DEBUG: Log subtitles on mount
   useEffect(() => {
@@ -91,28 +94,28 @@ useEffect(() => {
   }, [currentSubtitle, currentTime]);
 
   useEffect(() => {
-  let interval: NodeJS.Timeout;
+    let interval: NodeJS.Timeout;
 
-  if (isPlaying && !isDragging.current) {
-    // Manually poll the player's current time every 500ms
-    interval = setInterval(() => {
-      const time = player.currentTime;
-      setCurrentTime(time);
+    if (isPlaying && !isDragging.current) {
+      // Manually poll the player's current time every 500ms
+      interval = setInterval(() => {
+        const time = player.currentTime;
+        setCurrentTime(time);
 
-      // Trigger Subtitle Match
-      if (subtitles.length > 0) {
-        const matched = getSubtitleAtTime(subtitles, time * 1000);
-        if (matched?.index !== currentSubtitle?.index) {
-          setCurrentSubtitle(matched);
+        // Trigger Subtitle Match
+        if (subtitles.length > 0) {
+          const matched = getSubtitleAtTime(subtitles, time * 1000);
+          if (matched?.index !== currentSubtitle?.index) {
+            setCurrentSubtitle(matched);
+          }
         }
-      }
-    }, 500);
-  }
+      }, 500);
+    }
 
-  return () => {
-    if (interval) clearInterval(interval);
-  };
-}, [isPlaying, player, subtitles, currentSubtitle]);
+    return () => {
+      if (interval) clearInterval(interval);
+    };
+  }, [isPlaying, player, subtitles, currentSubtitle]);
 
   // Handle screen orientation changes
   useEffect(() => {
@@ -133,11 +136,11 @@ useEffect(() => {
   }, []);
 
   useEffect(() => {
-  // If the player is already loaded but state is 0, sync it manually
-  if (player.duration > 0 && duration === 0) {
-    setDuration(player.duration);
-  }
-}, [player.duration]);
+    // If the player is already loaded but state is 0, sync it manually
+    if (player.duration > 0 && duration === 0) {
+      setDuration(player.duration);
+    }
+  }, [player.duration]);
 
   const toggleRotation = async () => {
     try {
@@ -166,24 +169,24 @@ useEffect(() => {
 
 
 
-useEventListener(player, 'timeUpdate', (event) => {
-  // If manual buttons work but playback doesn't, 
-  // we must ensure the state is actually being set here.
-  const newTime = event.currentTime;
-  
-  // Update the progress bar and time text
-  setCurrentTime(newTime);
-  
-  // Trigger subtitle logic
-  if (subtitles && subtitles.length > 0) {
-    const timeMs = newTime * 1000;
-    const subtitle = getSubtitleAtTime(subtitles, timeMs);
-    
-    if (subtitle?.index !== currentSubtitle?.index) {
-      setCurrentSubtitle(subtitle);
+  useEventListener(player, 'timeUpdate', (event) => {
+    // If manual buttons work but playback doesn't, 
+    // we must ensure the state is actually being set here.
+    const newTime = event.currentTime;
+
+    // Update the progress bar and time text
+    setCurrentTime(newTime);
+
+    // Trigger subtitle logic
+    if (subtitles && subtitles.length > 0) {
+      const timeMs = newTime * 1000;
+      const subtitle = getSubtitleAtTime(subtitles, timeMs);
+
+      if (subtitle?.index !== currentSubtitle?.index) {
+        setCurrentSubtitle(subtitle);
+      }
     }
-  }
-});
+  });
 
   const seekTo = (seconds) => {
     if (!player || duration <= 0) return;
@@ -232,32 +235,32 @@ useEventListener(player, 'timeUpdate', (event) => {
   const handleWordPress = async (word: string) => {
     // Extract only Japanese characters (kanji, hiragana, katakana)
     const japaneseOnly = word.replace(/[^\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FFF]/g, '');
-    
+
     if (!japaneseOnly) {
       console.log('[VideoPlayer] No Japanese characters found in:', word);
       return;
     }
-    
+
     // If word is too long and contains multiple kanji/words, try to extract first word only
     // Split by hiragana boundaries to get first meaningful unit
     let wordToLookup = japaneseOnly;
-    
+
     // If it's multiple kanji/hiragana, try to get first meaningful chunk
     // Match first kanji + following hiragana, or just first character
     const firstWordMatch = japaneseOnly.match(/[\u4E00-\u9FFF]+[\u3040-\u309F]*/);
     if (firstWordMatch) {
       wordToLookup = firstWordMatch[0];
     }
-    
+
     console.log('[VideoPlayer] Word pressed (cleaned):', wordToLookup, '(original:', word + ')');
     setSelectedWord(wordToLookup);
     setDefinitionModalVisible(true);
     setSelectedDefinition(undefined); // Show loading state
-    
+
     // Fetch definition from Jisho API
     const definition = await getJishoDefinition(wordToLookup);
     console.log('[VideoPlayer] Got definition:', definition);
-    
+
     if (definition) {
       setSelectedDefinition({
         furigana: definition.hiragana,
@@ -277,12 +280,19 @@ useEventListener(player, 'timeUpdate', (event) => {
       setSelectedDefinition(null);
     }, 300);
   };
+
+  const handleSubtitlePress = () => {
+    if (currentSubtitle?.text) {
+      setSelectedSubtitleText(currentSubtitle.text);
+      setSubtitleModalVisible(true);
+    }
+  };
   return (
     <View style={styles.container}>
-      <VideoView 
-        player={player} 
-        style={styles.video} 
-        nativeControls={false} 
+      <VideoView
+        player={player}
+        style={styles.video}
+        nativeControls={false}
         contentFit="contain"
       />
 
@@ -294,40 +304,27 @@ useEventListener(player, 'timeUpdate', (event) => {
           </TouchableOpacity>
           <Text style={styles.title} numberOfLines={1}>{title}</Text>
           <TouchableOpacity onPress={toggleRotation}>
-            <Ionicons 
-              name={isLandscape ? "contract-outline" : "expand-outline"} 
-              size={24} 
-              color="white" 
+            <Ionicons
+              name={isLandscape ? "contract-outline" : "expand-outline"}
+              size={24}
+              color="white"
             />
           </TouchableOpacity>
         </View>
 
         {/* FIXED: Subtitle Display - Positioned higher, smaller text, tappable */}
         {currentSubtitle ? (
-          <Pressable 
+          <TouchableOpacity
             style={styles.subtitleWrapper}
-            onPress={() => {}}
+            onPress={handleSubtitlePress}
+            activeOpacity={0.9}
           >
             <View style={styles.subtitleContainer}>
-              <Text 
-                style={styles.subtitleText}
-                numberOfLines={0}
-              >
-                {currentSubtitle.text.split(/(\s+)/).map((word, index) => 
-                  word.trim() ? (
-                    <Pressable 
-                      key={index}
-                      onPress={() => handleWordPress(word.trim())}
-                    >
-                      <Text style={styles.subtitleWord}>{word}</Text>
-                    </Pressable>
-                  ) : (
-                    <Text key={index}>{word}</Text>
-                  )
-                )}
+              <Text style={styles.subtitleText} numberOfLines={0}>
+                {currentSubtitle.text}
               </Text>
             </View>
-          </Pressable>
+          </TouchableOpacity>
         ) : (
           // Debug indicator when no subtitle is active
           subtitles.length > 0 && __DEV__ && (
@@ -394,24 +391,22 @@ useEventListener(player, 'timeUpdate', (event) => {
         </View>
       </View>
 
-      <WordDefinitionModal
-        visible={definitionModalVisible}
-        word={selectedWord}
-        definition={selectedDefinition}
-        onClose={handleCloseDefinition}
-        onWordPress={handleWordPress}
+      <SubtitleSelectionModal
+        visible={subtitleModalVisible}
+        subtitleText={selectedSubtitleText}
+        onClose={() => setSubtitleModalVisible(false)}
       />
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { 
-    flex: 1, 
-    backgroundColor: '#000' 
+  container: {
+    flex: 1,
+    backgroundColor: '#000'
   },
-  video: { 
-    flex: 1 
+  video: {
+    flex: 1
   },
   overlay: {
     ...StyleSheet.absoluteFillObject,
@@ -434,53 +429,54 @@ const styles = StyleSheet.create({
     flex: 1,
     marginHorizontal: 12
   },
-  
+
   // FIXED: Subtitle positioning - higher up, no overlap with controls
-  subtitleWrapper: {
-    position: 'absolute',
-    bottom: 100, // Moved up from 120
-    left: 0,
-    right: 0,
-    alignItems: 'center',
-    justifyContent: 'center',
-    zIndex: 100,
-    pointerEvents: 'auto',
-    paddingHorizontal: 20,
-  },
-  subtitleContainer: {
-    backgroundColor: 'rgba(0, 0, 0, 0.85)',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 6,
-    maxWidth: '90%',
-    alignItems: 'center',
-  },
-  subtitleText: {
-    color: '#FFFFFF',
-    fontSize: 16, // Reduced from 18-28
-    fontWeight: '600',
-    textAlign: 'center',
-    lineHeight: 22,
-    textShadowColor: '#000000',
-    textShadowOffset: { width: 1, height: 1 },
-    textShadowRadius: 2,
-  },
+ subtitleWrapper: {
+  position: 'absolute',
+  bottom: 120,
+  left: 0,
+  right: 0,
+  alignItems: 'center',
+  justifyContent: 'center',
+  zIndex: 100,
+  paddingHorizontal: 20,
+},
+subtitleContainer: {
+  backgroundColor: 'rgba(0, 0, 0, 0.85)',
+  paddingHorizontal: 16,
+  paddingVertical: 10,
+  borderRadius: 8,
+  maxWidth: '90%',
+  alignItems: 'center',
+  borderWidth: 2,
+  borderColor: 'rgba(255, 152, 0, 0.6)', // Orange border hint
+},
+subtitleText: {
+  color: '#FFFFFF',
+  fontSize: 20,
+  fontWeight: '600',
+  textAlign: 'center',
+  lineHeight: 28,
+  textShadowColor: '#000000',
+  textShadowOffset: { width: 1, height: 1 },
+  textShadowRadius: 2,
+},
   subtitleWord: {
     color: '#FFFFFF',
-    fontSize: 16,
+    fontSize: 20, // ← Increased from 16 to 20
     fontWeight: '600',
     paddingHorizontal: 2,
   },
-  
+
   // FIXED: Bottom controls - compact and organized
-  bottomBar: { 
-    paddingHorizontal: 20, 
-    paddingBottom: 20 
+  bottomBar: {
+    paddingHorizontal: 20,
+    paddingBottom: 20
   },
-  sliderWrapper: { 
-    height: 32, 
-    justifyContent: 'center', 
-    marginBottom: 8 
+  sliderWrapper: {
+    height: 32,
+    justifyContent: 'center',
+    marginBottom: 8
   },
   track: {
     height: 4,
@@ -502,7 +498,7 @@ const styles = StyleSheet.create({
     top: -5,
     marginLeft: -7
   },
-  
+
   // NEW: Combined bottom row with time, controls, and duration
   bottomRow: {
     flexDirection: 'row',
@@ -523,11 +519,11 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center'
   },
-  smallBtn: { 
-    padding: 8 
+  smallBtn: {
+    padding: 8
   },
-  time: { 
-    color: 'white', 
+  time: {
+    color: 'white',
     fontSize: 13,
     fontWeight: '600',
     minWidth: 45,
