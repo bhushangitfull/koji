@@ -4,7 +4,6 @@
  */
 
 import { supabase } from '@/utils/supabase';
-import * as Crypto from 'expo-crypto';
 
 
 // Jisho API Types
@@ -265,7 +264,6 @@ export async function createFlashcard(
       .from('flashcards')
       .insert({
         episode_id: episodeId,
-        vocab_id: Crypto.randomUUID(),
         japanese_text: word,
         english_translation: definition.meaning,
         furigana: definition.furigana,
@@ -345,6 +343,7 @@ export async function generateQuizForEpisode(
       .insert({
         episode_id: episodeId,
         title: `Flashcard Review Quiz`,
+        quiz_type: 'flashcard_review',
         total_questions: flashcardIds.length,
       })
       .select('id')
