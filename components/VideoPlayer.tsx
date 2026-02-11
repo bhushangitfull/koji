@@ -449,7 +449,7 @@ subtitleContainer: {
   maxWidth: '90%',
   alignItems: 'center',
   borderWidth: 2,
-  borderColor: 'rgba(255, 152, 0, 0.6)', // Orange border hint
+  borderColor: 'rgba(214, 121, 223, 0.83)', // Orange border hint
 },
 subtitleText: {
   color: '#FFFFFF',
