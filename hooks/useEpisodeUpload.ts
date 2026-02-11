@@ -5,9 +5,11 @@ import {
   saveFileToEpisode
 } from '@/utils/fileSystem';
 import { parseSubtitles, Subtitle } from '@/utils/subtitleParser';
+import { supabase } from '@/utils/supabase';
 import * as Crypto from 'expo-crypto';
 import * as FileSystem from 'expo-file-system/legacy';
 import { useCallback, useEffect, useState } from 'react';
+
 
 
 
@@ -58,90 +60,115 @@ export const useEpisodeUpload = () => {
     }
   }, []);
 
-  const uploadEpisode = useCallback(
-    async (
-      videoUri: string,
-      subtitleUri: string | null,
-      title: string,
-      onProgress?: (progress: number) => void
-    ): Promise<LocalEpisode> => {
-      try {
-        setIsLoading(true);
-        setError(null);
-
-        const episodeId = Crypto.randomUUID();
-
-
-
-        onProgress?.(10);
-
-        await createEpisodeDirectory(episodeId);
-        onProgress?.(20);
-
-        const videoInfo = await FileSystem.getInfoAsync(videoUri);
-        const videoSize = videoInfo.size || 0;
-
-        const videoFileName = videoUri.split('/').pop() || `video.mp4`;
-        const savedVideoUri = await saveFileToEpisode(episodeId, videoUri, videoFileName);
-        onProgress?.(50);
-
-        let savedSubtitleUri: string | undefined;
-        let parsedSubtitles: Subtitle[] = [];
-
-        if (subtitleUri) {
-          try {
-            const subtitleFileName = subtitleUri.split('/').pop() || `subtitles.srt`;
-            savedSubtitleUri = await saveFileToEpisode(episodeId, subtitleUri, subtitleFileName);
-            console.log('[uploadEpisode] Saved subtitle to:', savedSubtitleUri);
-            
-            const subtitleContent = await readSubtitleFile(savedSubtitleUri);
-            console.log('[uploadEpisode] Read subtitle content:', {
-              length: subtitleContent.length,
-              preview: subtitleContent.substring(0, 200),
-            });
-            
-            const parsed = parseSubtitles(subtitleContent);
-            console.log('[uploadEpisode] Parsed subtitles:', {
-              format: parsed.format,
-              count: parsed.subtitles.length,
-              samples: parsed.subtitles.slice(0, 2),
-            });
-            
-            parsedSubtitles = parsed.subtitles;
-          } catch (subtitleError) {
-            console.warn('Subtitle processing failed:', subtitleError);
-          }
-        }
-
-        const newEpisode: LocalEpisode = {
-          id: episodeId,
-          title,
-          videoUri: savedVideoUri,
-          subtitleUri: savedSubtitleUri,
-          subtitles: parsedSubtitles,
-          size: videoSize,
-          uploadedAt: Date.now(),
-          processingStatus: 'completed',
-        };
-
-        // Update sequence: Get current disk state, add new, save, then update UI state
-        const currentEpisodes = await loadEpisodes();
-        const updated = [newEpisode, ...currentEpisodes];
-        await saveToDisk(updated);
-        setEpisodes(updated);
-
-        onProgress?.(100);
-        return newEpisode;
-      } catch (err) {
-        const errorMessage = err instanceof Error ? err.message : 'Upload failed';
-        setError(errorMessage);
-        throw err;
-      } finally {
-        setIsLoading(false);
+const uploadEpisode = useCallback(
+  async (
+    videoUri: string,
+    subtitleUri: string | null,
+    title: string,
+    onProgress?: (progress: number) => void
+  ): Promise<LocalEpisode> => {
+    try {
+      setIsLoading(true);
+      setError(null);
+       const { data: { user }, error: authError } = await supabase.auth.getUser();
+      
+      if (authError || !user) {
+        throw new Error('User not authenticated. Please log in first.');
       }
-    },
-    [loadEpisodes, saveToDisk]
-  );
+
+      const episodeId = Crypto.randomUUID();
+      onProgress?.(10);
+
+      await createEpisodeDirectory(episodeId);
+      onProgress?.(20);
+
+      const videoInfo = await FileSystem.getInfoAsync(videoUri);
+      const videoSize = videoInfo.size || 0;
+
+      const videoFileName = videoUri.split('/').pop() || `video.mp4`;
+      const savedVideoUri = await saveFileToEpisode(episodeId, videoUri, videoFileName);
+      onProgress?.(50);
+
+      let savedSubtitleUri: string | undefined;
+      let parsedSubtitles: Subtitle[] = [];
+
+      if (subtitleUri) {
+        try {
+          const subtitleFileName = subtitleUri.split('/').pop() || `subtitles.srt`;
+          savedSubtitleUri = await saveFileToEpisode(episodeId, subtitleUri, subtitleFileName);
+          console.log('[uploadEpisode] Saved subtitle to:', savedSubtitleUri);
+          
+          const subtitleContent = await readSubtitleFile(savedSubtitleUri);
+          console.log('[uploadEpisode] Read subtitle content:', {
+            length: subtitleContent.length,
+            preview: subtitleContent.substring(0, 200),
+          });
+          
+          const parsed = parseSubtitles(subtitleContent);
+          console.log('[uploadEpisode] Parsed subtitles:', {
+            format: parsed.format,
+            count: parsed.subtitles.length,
+            samples: parsed.subtitles.slice(0, 2),
+          });
+          
+          parsedSubtitles = parsed.subtitles;
+        } catch (subtitleError) {
+          console.warn('Subtitle processing failed:', subtitleError);
+        }
+      }
+
+      onProgress?.(70);
+
+      // ✅ ADD THIS: Save episode to Supabase database
+      const { error: supabaseError } = await supabase
+        .from('episodes')
+        .insert({
+          id: episodeId,
+          user_id: user.id,
+          title: title,
+          video_uri: savedVideoUri, // Adjust field names to match your schema
+          subtitle_uri: savedSubtitleUri,
+          file_size: videoSize,
+          processing_status: 'completed',
+        });
+
+      if (supabaseError) {
+        console.error('Error saving episode to Supabase:', supabaseError);
+        throw new Error('Failed to save episode to database');
+      }
+
+      console.log('Episode saved to Supabase successfully:', episodeId);
+      onProgress?.(85);
+
+      const newEpisode: LocalEpisode = {
+        id: episodeId,
+        title,
+        videoUri: savedVideoUri,
+        subtitleUri: savedSubtitleUri,
+        subtitles: parsedSubtitles,
+        size: videoSize,
+        uploadedAt: Date.now(),
+        processingStatus: 'completed',
+      };
+
+      // Update sequence: Get current disk state, add new, save, then update UI state
+      const currentEpisodes = await loadEpisodes();
+      const updated = [newEpisode, ...currentEpisodes];   
+      await saveToDisk(updated);
+      setEpisodes(updated);
+
+      onProgress?.(100);
+      return newEpisode;
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Upload failed';
+      setError(errorMessage);
+      throw err;
+    } finally {
+      setIsLoading(false);
+    }
+  },
+  [loadEpisodes, saveToDisk]
+);
 
   const updateSubtitles = useCallback(
     async (episodeId: string, subtitleUri: string): Promise<void> => {
