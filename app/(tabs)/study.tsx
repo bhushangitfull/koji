@@ -4,7 +4,7 @@ import { Colors, Fonts } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { Feather, MaterialIcons } from '@expo/vector-icons';
 import { useEffect, useState } from 'react';
-import { Modal, ScrollView, StyleSheet, Text, TouchableOpacity, View, TextInput, ActivityIndicator, Alert } from 'react-native';
+import { Modal, ScrollView, StyleSheet, Text, TouchableOpacity, View, ActivityIndicator, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { AudioPlayer } from '@/components/AudioPlayer';
 import { useFlashcards } from '@/hooks/useFlashcards';
@@ -12,9 +12,10 @@ import { useQuizzes, useQuizQuestions } from '@/hooks/useQuizzes';
 import { useEpisodes } from '@/hooks/useEpisodes';
 import { useFlashcardProgress } from '@/hooks/useFlashcardProgress';
 import { useAuth } from '@/hooks/useAuth';
+import { useUserStats } from '@/hooks/useSupabaseData';
 import { supabase } from '@/utils/supabase';
-import { Flashcard, QuizQuestion, QuestionType, QuizAttempt } from '@/types/study';
-import { updateUserStats, recordQuizAttempt } from '@/utils/statsUtils';
+import { Flashcard, QuizQuestion } from '@/types/study';
+import { updateUserStats } from '@/utils/statsUtils';
 
 // Mock streak calendar data - 52 weeks * 7 days
 const generateStreakData = () => {
@@ -64,7 +65,32 @@ interface SessionState {
 // Separate component for each episode card to fetch its own data
 function EpisodeCard({ episode, colors, onOpenFlashcard, onOpenQuiz }: any) {
   const { flashcards } = useFlashcards(episode.id);
-  const { quizzes } = useQuizzes(episode.id);
+  const { quizzes, loading: quizzesLoading, refetch: refetchQuizzes } = useQuizzes(episode.id);
+  const [generatingQuiz, setGeneratingQuiz] = useState(false);
+
+  // Auto-generate quiz when flashcards are available and no quiz exists
+  useEffect(() => {
+    const autoGenerateQuiz = async () => {
+      if (!quizzesLoading && flashcards.length > 0 && quizzes.length === 0 && !generatingQuiz) {
+        try {
+          setGeneratingQuiz(true);
+          const { generateQuizFromFlashcards } = await import('@/utils/quizGenerator');
+          const quizId = await generateQuizFromFlashcards(episode.id, flashcards);
+          if (quizId) {
+            // Refetch quizzes after generation
+            await new Promise((resolve) => setTimeout(resolve, 500)); // Small delay for DB consistency
+            refetchQuizzes?.();
+          }
+        } catch (error) {
+          console.error('Error auto-generating quiz:', error);
+        } finally {
+          setGeneratingQuiz(false);
+        }
+      }
+    };
+
+    autoGenerateQuiz();
+  }, [flashcards, quizzes, quizzesLoading, episode.id, generatingQuiz, refetchQuizzes]);
 
   return (
     <View style={styles.sessionCard}>
@@ -143,6 +169,7 @@ export default function StudyScreen() {
   const [selectedQuizId, setSelectedQuizId] = useState<string | undefined>();
   const { questions: quizQuestions } = useQuizQuestions(selectedQuizId);
   const { progress: flashcardProgress, recordFlashcardReview } = useFlashcardProgress(user?.id);
+  const { stats } = useUserStats(user?.id);
 
   // UI state
   const [streakModalVisible, setStreakModalVisible] = useState(false);
@@ -194,7 +221,7 @@ export default function StudyScreen() {
         .from('quiz_questions')
         .select('*')
         .eq('quiz_id', quizId)
-        .order('created_at', { ascending: true });
+        .order('id', { ascending: true });
       
       if (error || !questions) {
         console.error('Error fetching quiz questions:', error);
@@ -202,11 +229,17 @@ export default function StudyScreen() {
         return;
       }
       
+      // Parse options if they're stored as strings
+      const parsedQuestions = questions.map((q: any) => ({
+        ...q,
+        options: Array.isArray(q.options) ? q.options : (typeof q.options === 'string' ? JSON.parse(q.options) : []),
+      }));
+      
       setActiveSession({
         type: 'quiz',
         episodeId,
         episodeTitle,
-        data: questions,
+        data: parsedQuestions,
         quizId,
       });
       setCurrentQuestionIndex(0);
@@ -278,227 +311,109 @@ export default function StudyScreen() {
 
     if (activeSession.type === 'quiz' && activeSession.data.length > 0) {
       const question = activeSession.data[currentQuestionIndex];
+
+      // All quiz questions should use proper multiple choice format
       const isAnswered = userAnswers[question.id] !== undefined;
+      const userCorrect = isAnswered && userAnswers[question.id].toLowerCase() === question.correct_answer.toLowerCase();
+      const totalQuestions = activeSession.data.length;
+      const progress = ((currentQuestionIndex + 1) / totalQuestions) * 100;
 
-      // Flashcard Review format - NOW A PROPER QUIZ
-      if (question.question_type === 'flashcard_review' || question.question_type === QuestionType.FLASHCARD_REVIEW) {
-        const isAnswered = userAnswers[question.id] !== undefined;
-        const userCorrect = userAnswers[question.id] === 'correct';
-        const totalQuestions = activeSession.data.length;
-        const progress = ((currentQuestionIndex + 1) / totalQuestions) * 100;
-
-        return (
-          <View style={styles.testContent}>
-            {/* Progress Header */}
-            <View style={{ marginBottom: 20 }}>
-              <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 }}>
-                <Text style={[styles.testQuestion, { color: '#000000', fontSize: 16 }]}>
-                  Question {currentQuestionIndex + 1} of {totalQuestions}
-                </Text>
-                <Text style={[styles.testQuestion, { color: colors.primary, fontSize: 16, fontWeight: 'bold' }]}>
-                  {Math.round(progress)}%
-                </Text>
-              </View>
-              {/* Progress Bar */}
-              <View style={{ backgroundColor: '#E0E0E0', height: 6, borderRadius: 3, overflow: 'hidden' }}>
-                <View
-                  style={{
-                    backgroundColor: colors.primary,
-                    height: '100%',
-                    width: `${progress}%`,
-                  }}
-                />
-              </View>
-            </View>
-
-            {/* Quiz Card */}
-            <View style={[styles.vocabCard, { borderColor: colors.primary, marginVertical: 24, borderWidth: 2 }]}>
-              <Text style={[styles.vocabWord, { color: colors.primary, fontSize: 36, marginBottom: 12 }]}>
-                {question.question_text}
+      return (
+        <View style={styles.testContent}>
+          {/* Progress Header */}
+          <View style={{ marginBottom: 20 }}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 }}>
+              <Text style={[styles.testQuestion, { color: '#000000', fontSize: 16 }]}>
+                Question {currentQuestionIndex + 1} of {totalQuestions}
               </Text>
-              <Text style={[styles.vocabMeaning, { color: '#666666', fontSize: 14, marginBottom: 20 }]}>
-                What does this word mean?
+              <Text style={[styles.testQuestion, { color: colors.primary, fontSize: 16, fontWeight: 'bold' }]}>
+                {Math.round(progress)}%
               </Text>
-              {flipped ? (
-                <>
-                  <Text style={[styles.vocabMeaning, { color: '#333333', fontSize: 18, fontWeight: 'bold' }]}>
-                    {question.correct_answer}
-                  </Text>
-                  {!isAnswered && (
-                    <View style={{ marginTop: 20, gap: 12 }}>
-                      <TouchableOpacity
-                        style={[
-                          styles.optionButton,
-                          {
-                            backgroundColor: '#A8E6CF',
-                            borderColor: '#7FE5DE',
-                            borderWidth: 2,
-                          },
-                        ]}
-                        onPress={() => {
-                          setUserAnswers({ ...userAnswers, [question.id]: 'correct' });
-                        }}
-                      >
-                        <Text style={[styles.optionText, { color: '#000000', fontWeight: 'bold', fontSize: 16 }]}>
-                          ✓ Correct
-                        </Text>
-                      </TouchableOpacity>
-                      <TouchableOpacity
-                        style={[
-                          styles.optionButton,
-                          {
-                            backgroundColor: '#FFB3B3',
-                            borderColor: '#FF6B6B',
-                            borderWidth: 2,
-                          },
-                        ]}
-                        onPress={() => {
-                          setUserAnswers({ ...userAnswers, [question.id]: 'incorrect' });
-                        }}
-                      >
-                        <Text style={[styles.optionText, { color: '#000000', fontWeight: 'bold', fontSize: 16 }]}>
-                          ✗ Incorrect
-                        </Text>
-                      </TouchableOpacity>
-                    </View>
-                  )}
-                </>
-              ) : (
-                <Text style={[styles.vocabMeaning, { color: '#999999', fontSize: 14 }]}>
-                  Click "Show Answer" to reveal
-                </Text>
-              )}
             </View>
-
-            {/* Show/Hide Answer Button */}
-            {!isAnswered && (
-              <TouchableOpacity
-                style={[styles.actionButton, { backgroundColor: colors.primary + '20', marginTop: 16 }]}
-                onPress={() => setFlipped(!flipped)}
-              >
-                <Text style={[styles.actionButtonText, { color: colors.primary }]}>
-                  {flipped ? '👁️ Hide Answer' : '👁️ Show Answer'}
-                </Text>
-              </TouchableOpacity>
-            )}
-
-            {/* Feedback */}
-            {isAnswered && (
+            {/* Progress Bar */}
+            <View style={{ backgroundColor: '#E0E0E0', height: 6, borderRadius: 3, overflow: 'hidden' }}>
               <View
-                style={[
-                  styles.vocabExample,
-                  {
-                    backgroundColor: userCorrect ? '#A8E6CF30' : '#FF6B6B30',
-                    borderColor: userCorrect ? '#7FE5DE' : '#FF6B6B',
-                    borderWidth: 2,
-                    marginTop: 16,
-                  },
-                ]}
-              >
-                <Text style={[styles.vocabExampleText, { color: userCorrect ? '#2B8659' : '#C92A2A', fontWeight: 'bold' }]}>
-                  {userCorrect ? '✓ Correct! +10 pts' : '✗ Incorrect. 0 pts'}
-                </Text>
-              </View>
-            )}
+                style={{
+                  backgroundColor: colors.primary,
+                  height: '100%',
+                  width: `${progress}%`,
+                }}
+              />
+            </View>
           </View>
-        );
-      }
 
-      if (question.question_type === QuestionType.LISTENING && question.audio_url) {
-        return (
-          <View style={styles.testContent}>
-            <Text style={[styles.testQuestion, { color: '#000000' }]}>
-              {question.question_text}
-            </Text>
-            <AudioPlayer audioUrl={question.audio_url} label="Listen" />
-            {question.options && (
-              <View style={styles.optionsContainer}>
-                {question.options.map((option, idx) => (
+          {/* Question */}
+          <Text style={[styles.testQuestion, { color: '#000000', marginBottom: 24 }]}>
+            {question.question_text}
+          </Text>
+
+          {/* Options */}
+          {question.options && (
+            <View style={styles.optionsContainer}>
+              {question.options.map((option, idx) => {
+                const isSelected = userAnswers[question.id] === option;
+                const isCorrectOption = option.toLowerCase() === question.correct_answer.toLowerCase();
+                let backgroundColor = '#F5F5F5';
+                let borderColor = '#E0E0E0';
+
+                if (isAnswered) {
+                  if (isCorrectOption) {
+                    backgroundColor = '#A8E6CF';
+                    borderColor = '#7FE5DE';
+                  } else if (isSelected && !userCorrect) {
+                    backgroundColor = '#FFB3B3';
+                    borderColor = '#FF6B6B';
+                  }
+                } else if (isSelected) {
+                  backgroundColor = colors.primary + '20';
+                  borderColor = colors.primary;
+                }
+
+                return (
                   <TouchableOpacity
                     key={idx}
                     style={[
                       styles.optionButton,
                       {
-                        backgroundColor:
-                          userAnswers[question.id] === option
-                            ? colors.primary + '20'
-                            : '#F5F5F5',
-                        borderColor:
-                          userAnswers[question.id] === option
-                            ? colors.primary
-                            : '#E0E0E0',
+                        backgroundColor,
+                        borderColor,
+                        borderWidth: 2,
                       },
                     ]}
-                    onPress={() =>
-                      setUserAnswers({ ...userAnswers, [question.id]: option })
-                    }
+                    onPress={() => {
+                      if (!isAnswered) {
+                        setUserAnswers({ ...userAnswers, [question.id]: option });
+                      }
+                    }}
+                    disabled={isAnswered}
                   >
-                    <Text style={[styles.optionText, { color: '#000000' }]}>
+                    <Text style={[styles.optionText, { color: '#000000', fontWeight: '600' }]}>
                       {option}
+                      {isAnswered && isCorrectOption && ' ✓'}
+                      {isAnswered && isSelected && !userCorrect && ' ✗'}
                     </Text>
                   </TouchableOpacity>
-                ))}
-              </View>
-            )}
-          </View>
-        );
-      }
+                );
+              })}
+            </View>
+          )}
 
-      if (question.question_type === QuestionType.FILL_BLANK) {
-        return (
-          <View style={styles.testContent}>
-            <Text style={[styles.testQuestion, { color: '#000000' }]}>
-              {question.question_text}
-            </Text>
-            <TextInput
+          {/* Feedback */}
+          {isAnswered && (
+            <View
               style={[
-                styles.fillBlankInput,
-                { borderColor: colors.primary, color: '#000000' },
+                styles.vocabExample,
+                {
+                  backgroundColor: userCorrect ? '#A8E6CF30' : '#FF6B6B30',
+                  borderColor: userCorrect ? '#7FE5DE' : '#FF6B6B',
+                  borderWidth: 2,
+                  marginTop: 16,
+                },
               ]}
-              placeholder="Type your answer..."
-              placeholderTextColor="#999999"
-              value={userAnswers[question.id] || ''}
-              onChangeText={(text) =>
-                setUserAnswers({ ...userAnswers, [question.id]: text })
-              }
-            />
-          </View>
-        );
-      }
-
-      // Multiple choice
-      return (
-        <View style={styles.testContent}>
-          <Text style={[styles.testQuestion, { color: '#000000' }]}>
-            {question.question_text}
-          </Text>
-          {question.options && (
-            <View style={styles.optionsContainer}>
-              {question.options.map((option, idx) => (
-                <TouchableOpacity
-                  key={idx}
-                  style={[
-                    styles.optionButton,
-                    {
-                      backgroundColor:
-                        userAnswers[question.id] === option
-                          ? colors.primary + '20'
-                          : '#F5F5F5',
-                      borderColor:
-                        userAnswers[question.id] === option
-                          ? colors.primary
-                          : '#E0E0E0',
-                    },
-                  ]}
-                  onPress={() =>
-                    setUserAnswers({ ...userAnswers, [question.id]: option })
-                  }
-                >
-                  <Text style={[styles.optionText, { color: '#000000' }]}>
-                    {option}
-                  </Text>
-                </TouchableOpacity>
-              ))}
+            >
+              <Text style={[styles.vocabExampleText, { color: userCorrect ? '#2B8659' : '#C92A2A', fontWeight: 'bold', fontSize: 16 }]}>
+                {userCorrect ? '✓ Correct! +10 pts' : '✗ Incorrect. 0 pts'}
+              </Text>
             </View>
           )}
         </View>
@@ -550,12 +465,15 @@ export default function StudyScreen() {
     try {
       setSubmitting(true);
       let correctCount = 0;
+      let totalPoints = 0;
+      const pointsPerCorrectAnswer = 10;
 
-      // Calculate score
+      // Calculate score - only award points for correct answers
       activeSession.data.forEach((question) => {
         const userAnswer = userAnswers[question.id];
         if (userAnswer && userAnswer.toLowerCase() === question.correct_answer.toLowerCase()) {
           correctCount++;
+          totalPoints += pointsPerCorrectAnswer;
         }
       });
 
@@ -564,15 +482,25 @@ export default function StudyScreen() {
 
       // Save quiz attempt to Supabase
       if (activeSession.quizId) {
-        await supabase.from('user_quiz_attempts').insert({
+        const { error } = await supabase.from('user_quiz_attempts').insert({
           user_id: user.id,
           quiz_id: activeSession.quizId,
           score: correctCount,
           total_questions: activeSession.data.length,
           percentage_correct: Math.round(percentage),
+          total_points_earned: totalPoints,
           answers: userAnswers,
           attempted_at: new Date().toISOString(),
         });
+
+        if (error) throw error;
+
+        // Update user_stats with points
+        if (totalPoints > 0) {
+          await updateUserStats(user.id, {
+            points: totalPoints,
+          });
+        }
       }
     } catch (error) {
       console.error('Error submitting quiz:', error);
@@ -623,7 +551,9 @@ export default function StudyScreen() {
           <View style={styles.streakInfo}>
             <MaterialIcons name="local-fire-department" size={28} color={colors.primary} />
             <View>
-              <Text style={[styles.streakNumber, { color: colors.primary }]}>12</Text>
+              <Text style={[styles.streakNumber, { color: colors.primary }]}>
+                {stats?.streak ?? 0}
+              </Text>
               <Text style={[styles.streakLabel, { color: '#666666' }]}>Day Streak</Text>
             </View>
           </View>
@@ -655,17 +585,23 @@ export default function StudyScreen() {
               </View>
 
               <View style={styles.streakStats}>
-                <View style={styles.streakStat}>
-                  <Text style={[styles.statValue, { color: colors.primary }]}>12</Text>
+               <View style={styles.streakStat}>
+                  <Text style={[styles.statValue, { color: colors.primary }]}>
+                    {stats?.streak ?? 0}
+                  </Text>
                   <Text style={[styles.statLabel, { color: '#666666' }]}>Current Streak</Text>
                 </View>
                 <View style={styles.streakStat}>
-                  <Text style={[styles.statValue, { color: colors.primary }]}>156</Text>
-                  <Text style={[styles.statLabel, { color: '#666666' }]}>Total Days</Text>
+                  <Text style={[styles.statValue, { color: colors.primary }]}>
+                    {stats?.totalPoints ?? 0}
+                  </Text>
+                  <Text style={[styles.statLabel, { color: '#666666' }]}>Total Points</Text>
                 </View>
                 <View style={styles.streakStat}>
-                  <Text style={[styles.statValue, { color: colors.primary }]}>31</Text>
-                  <Text style={[styles.statLabel, { color: '#666666' }]}>Longest Streak</Text>
+                  <Text style={[styles.statValue, { color: colors.primary }]}>
+                    {stats?.weeklyPoints ?? 0}
+                  </Text>
+                  <Text style={[styles.statLabel, { color: '#666666' }]}>Weekly Points</Text>
                 </View>
               </View>
 
@@ -852,7 +788,8 @@ export default function StudyScreen() {
                  <TouchableOpacity
                    disabled={
                      currentQuestionIndex === getMaxSamples() - 1 ||
-                     getMaxSamples() === 0
+                     getMaxSamples() === 0 ||
+                     (activeSession?.type === 'quiz' && !userAnswers[activeSession.data[currentQuestionIndex]?.id])
                    }
                    onPress={() => setCurrentQuestionIndex(currentQuestionIndex + 1)}
                    style={[
@@ -860,7 +797,8 @@ export default function StudyScreen() {
                      {
                        opacity:
                          currentQuestionIndex === getMaxSamples() - 1 ||
-                         getMaxSamples() === 0
+                         getMaxSamples() === 0 ||
+                         (activeSession?.type === 'quiz' && !userAnswers[activeSession.data[currentQuestionIndex]?.id])
                            ? 0.5
                            : 1,
                      },

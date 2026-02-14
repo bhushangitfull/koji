@@ -3,6 +3,7 @@ import { RetroWindow } from '@/components/ui/retro-window';
 import { Colors, Fonts } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useAuth } from '@/hooks/useAuth';
+import { useUserStats } from '@/hooks/useSupabaseData';
 import { useUserProfile } from '@/hooks/useUserProfile';
 import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
@@ -48,6 +49,7 @@ export default function ProfileScreen() {
   const colors = Colors[colorScheme ?? 'light'];
   const { signOut, user } = useAuth();
   const { profile, loading } = useUserProfile();
+  const { stats } = useUserStats(user?.id);
   const router = useRouter();
 
   const handleLogout = async () => {
@@ -163,6 +165,13 @@ export default function ProfileScreen() {
               <Text style={[styles.bioText, { color: '#333333' }]}>{profile.bio}</Text>
             </View>
           )}
+
+          {/* KPoints Badge */}
+          <View style={styles.kpointsBadge}>
+            <MaterialCommunityIcons name="currency-jpy" size={16} color="#FFD700" />
+            <Text style={styles.kpointsValue}>{stats?.totalPoints ?? 0}</Text>
+            <Text style={styles.kpointsLabel}>KPoints</Text>
+          </View>
         </RetroWindow>
 
         {/* Stats Grid */}
@@ -171,7 +180,7 @@ export default function ProfileScreen() {
             <View style={styles.statContent}>
               <MaterialCommunityIcons name="fire" size={28} color={colors.primary} />
               <Text style={[styles.statValue, { color: colors.primary }]}>
-                {profile.current_streak}
+                {stats?.streak ?? profile.current_streak ?? 0}
               </Text>
               <Text style={[styles.statLabel, { color: '#333333' }]}>Day Streak</Text>
             </View>
@@ -236,39 +245,6 @@ export default function ProfileScreen() {
             </View>
             <Text style={[styles.infoValue, { color: '#333333' }]}>
               {profile.longest_streak} days
-            </Text>
-          </View>
-        </RetroWindow>
-
-        {/* Learning Stats */}
-        <RetroWindow title="Learning Progress" color="mint" style={styles.infoCard}>
-          <View style={styles.progressRow}>
-            <View style={styles.progressLabel}>
-              <MaterialCommunityIcons name="book" size={20} color={colors.primary} />
-              <Text style={[styles.progressText, { color: '#333333' }]}>Words Learned</Text>
-            </View>
-            <Text style={[styles.progressValue, { color: colors.primary }]}>
-              {profile.total_words_learned}
-            </Text>
-          </View>
-
-          <View style={[styles.progressRow, styles.infoRowBorder]}>
-            <View style={styles.progressLabel}>
-              <MaterialCommunityIcons name="format-quote-close" size={20} color={colors.primary} />
-              <Text style={[styles.progressText, { color: '#333333' }]}>Phrases Learned</Text>
-            </View>
-            <Text style={[styles.progressValue, { color: colors.primary }]}>
-              {profile.total_phrases_learned}
-            </Text>
-          </View>
-
-          <View style={[styles.progressRow, styles.infoRowBorder]}>
-            <View style={styles.progressLabel}>
-              <MaterialCommunityIcons name="play-circle" size={20} color={colors.primary} />
-              <Text style={[styles.progressText, { color: '#333333' }]}>Episodes Watched</Text>
-            </View>
-            <Text style={[styles.progressValue, { color: colors.primary }]}>
-              {profile.total_episodes_watched}
             </Text>
           </View>
         </RetroWindow>
@@ -412,6 +388,27 @@ const styles = StyleSheet.create({
     fontSize: 14,
     lineHeight: 20,
     fontFamily: Fonts.mono,
+  },
+  kpointsBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: '#E0E0E0',
+  },
+  kpointsValue: {
+    fontSize: 16,
+    fontWeight: '700',
+    fontFamily: Fonts.mono,
+    color: '#FFD700',
+  },
+  kpointsLabel: {
+    fontSize: 11,
+    fontWeight: '600',
+    fontFamily: Fonts.mono,
+    color: '#666666',
+    marginLeft: 4,
   },
   statsGrid: {
     flexDirection: 'row',

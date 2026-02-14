@@ -1,9 +1,14 @@
 /**
  * User Stats Tracking
- * Updates user_stats table after quiz completion
+ * Updates user_stats table after quiz completion, handles streaks and points
  */
 
 import { supabase } from '@/utils/supabase';
+import {
+  recordUserActivity,
+  updateUserTierIfNeeded,
+  calculateStreakBonus,
+} from '@/utils/streakUtils';
 
 export interface UserStats {
   id: string;
@@ -102,12 +107,15 @@ export async function recalculateWeeklyRank(userId: string, weeklyPoints: number
  */
 export async function updateUserStats(
   userId: string,
-  quizScore: number,
-  totalQuestions: number
+  options: {
+    points?: number;
+    quizScore?: number;
+    totalQuestions?: number;
+  } = {}
 ): Promise<{ success: boolean; stats: UserStats | null; message: string }> {
   try {
-    // Calculate points awarded
-    const pointsAwarded = quizScore * 10; // 10 points per correct answer
+    // Handle both old and new parameter formats for backwards compatibility
+    const pointsAwarded = options.points || (options.quizScore ? options.quizScore * 10 : 0);
 
     console.log('[Stats] Updating for user:', userId, 'Points:', pointsAwarded);
 
@@ -119,21 +127,52 @@ export async function updateUserStats(
       .single();
 
     if (fetchError && fetchError.code !== 'PGRST116') {
-      // PGRST116 = no rows returned (first time user)
       console.error('Error fetching user stats:', fetchError);
       return { success: false, stats: null, message: 'Failed to fetch user stats' };
     }
 
-    // Calculate new streak
-    const newStreak = calculateDailyStreak(
-      currentStats?.last_activity_date || null,
-      currentStats?.daily_streak || 0
+    // If no stats exist, create initial record
+    if (!currentStats) {
+      const { data: initialStats, error: createError } = await supabase
+        .from('user_stats')
+        .insert({
+          user_id: userId,
+          total_points: pointsAwarded,
+          weekly_points: pointsAwarded,
+          daily_streak: 1,
+          longest_streak: 1,
+          last_activity_date: new Date().toISOString(),
+          current_tier: 'Beginner',
+        })
+        .select()
+        .single();
+
+      if (createError) {
+        console.error('Error creating stats:', createError);
+        return { success: false, stats: null, message: 'Failed to create stats' };
+      }
+
+      currentStats = initialStats;
+    }
+
+    // Calculate streak bonus
+    const streakBonus = calculateStreakBonus(currentStats.daily_streak || 0);
+
+    // Calculate total points to add (including bonus)
+    const totalPointsToAdd = pointsAwarded + streakBonus;
+
+    // Calculate new totals
+    const totalPoints = (currentStats.total_points || 0) + totalPointsToAdd;
+    const weeklyPoints = (currentStats.weekly_points || 0) + totalPointsToAdd;
+
+    console.log(
+      '[Stats] New totals - Total:',
+      totalPoints,
+      'Weekly:',
+      weeklyPoints,
+      'Streak:',
+      currentStats.daily_streak
     );
-
-    const totalPoints = (currentStats?.total_points || 0) + pointsAwarded;
-    const weeklyPoints = (currentStats?.weekly_points || 0) + pointsAwarded;
-
-    console.log('[Stats] New totals - Total:', totalPoints, 'Weekly:', weeklyPoints, 'Streak:', newStreak);
 
     // Calculate new ranks
     const rankGlobal = await recalculateGlobalRank(userId, totalPoints);
@@ -141,22 +180,17 @@ export async function updateUserStats(
 
     console.log('[Stats] New ranks - Global:', rankGlobal, 'Weekly:', rankWeekly);
 
-    // Upsert user stats (create if doesn't exist, update if does)
+    // Upsert user stats
     const { data: updatedStats, error: updateError } = await supabase
       .from('user_stats')
-      .upsert(
-        {
-          user_id: userId,
-          total_points: totalPoints,
-          weekly_points: weeklyPoints,
-          daily_streak: newStreak,
-          last_activity_date: new Date().toISOString(),
-          rank_global: rankGlobal,
-          rank_weekly: rankWeekly,
-          updated_at: new Date().toISOString(),
-        },
-        { onConflict: 'user_id' }
-      )
+      .update({
+        total_points: totalPoints,
+        weekly_points: weeklyPoints,
+        rank_global: rankGlobal,
+        rank_weekly: rankWeekly,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('user_id', userId)
       .select()
       .single();
 
@@ -165,12 +199,18 @@ export async function updateUserStats(
       return { success: false, stats: null, message: 'Failed to update user stats' };
     }
 
+    // Record daily activity for streak tracking
+    await recordUserActivity(userId, 'quiz', totalPointsToAdd);
+
+    // Update tier if needed
+    await updateUserTierIfNeeded(userId, totalPoints);
+
     console.log('[Stats] Successfully updated user stats');
 
     return {
       success: true,
       stats: updatedStats,
-      message: `Earned ${pointsAwarded} points!`,
+      message: `Earned ${totalPointsToAdd} points! ${streakBonus > 0 ? `(+${streakBonus} streak bonus)` : ''}`,
     };
   } catch (error) {
     console.error('Error in updateUserStats:', error);
@@ -271,7 +311,7 @@ export async function fetchUserProgress(userId: string): Promise<{
 
     return {
       wordsLearned: wordsLearned || 0,
-      episodesWatched: episodeData?.count || 0,
+      episodesWatched: (episodeData as any)?.count || 0,
       quizzesCompleted: quizzesCompleted || 0,
     };
   } catch (error) {

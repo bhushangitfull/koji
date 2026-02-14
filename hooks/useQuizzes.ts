@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { supabase } from '@/utils/supabase';
 import { Quiz, QuizQuestion } from '@/types/study';
 
@@ -6,6 +6,11 @@ export function useQuizzes(episodeId?: string) {
   const [quizzes, setQuizzes] = useState<Quiz[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
+  const [refetchKey, setRefetchKey] = useState(0);
+
+  const refetch = useCallback(() => {
+    setRefetchKey((prev) => prev + 1);
+  }, []);
 
   useEffect(() => {
     async function fetchQuizzes() {
@@ -37,9 +42,9 @@ export function useQuizzes(episodeId?: string) {
     }
 
     fetchQuizzes();
-  }, [episodeId]);
+  }, [episodeId, refetchKey]);
 
-  return { quizzes, loading, error };
+  return { quizzes, loading, error, refetch };
 }
 
 export function useQuizQuestions(quizId?: string) {

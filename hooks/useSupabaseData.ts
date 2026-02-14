@@ -35,103 +35,104 @@ export function useUserStats(userId?: string) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
 
-  useEffect(() => {
-    async function fetchUserStats() {
-      try {
-        setLoading(true);
-        
-        // Get current user if userId not provided
-        const { data: { user }, error: authError } = await supabase.auth.getUser();
-        
-        if (authError) {
-          console.log('Auth error:', authError);
-          // User not logged in, use default stats
-          setStats(getDefaultStats());
-          setError(null);
-          setLoading(false);
-          return;
-        }
-
-        const currentUserId = userId || user?.id;
-        
-        if (!currentUserId) {
-          console.log('No user ID found, using default stats');
-          setStats(getDefaultStats());
-          setError(null);
-          setLoading(false);
-          return;
-        }
-
-        // Try to fetch user stats
-        const { data, error: fetchError } = await supabase
-          .from('user_stats')
-          .select('*')
-          .eq('user_id', currentUserId)
-          .maybeSingle(); // Use maybeSingle instead of single to handle empty results
-
-        if (fetchError) {
-          console.error('Fetch error:', fetchError);
-          throw fetchError;
-        }
-
-        // If no data exists, create initial stats for this user
-        if (!data) {
-          console.log('No stats found for user, creating initial stats...');
-          
-          const initialStats: UserStats = getDefaultStats();
-          
-          // Try to insert initial user stats
-          const { error: insertError } = await supabase
-            .from('user_stats')
-            .insert({
-              user_id: currentUserId,
-              total_points: 0,
-              weekly_points: 0,
-              daily_streak: 0,
-              rank_global: null,
-              rank_weekly: null,
-            });
-
-          if (insertError) {
-            console.error('Error creating initial stats:', insertError);
-          }
-
-          setStats(initialStats);
-          setError(null);
-          setLoading(false);
-          return;
-        }
-
-        // Transform database data to UserStats format
-        const userStats: UserStats = {
-          streak: data.daily_streak || 0,
-          wordsLearned: Math.floor((data.total_points || 0) / 10), // Assuming 10 points per word
-          phrasesLearned: Math.floor((data.total_points || 0) / 25), // Assuming 25 points per phrase
-          minutesToday: 0, // This would need to be calculated from activity log
-          totalMinutesThisMonth: Math.floor((data.total_points || 0) / 2), // Assuming 2 points per minute
-          totalEpisodesCompleted: Math.floor((data.total_points || 0) / 50), // Assuming 50 points per episode
-          currentLevel: getLevelFromPoints(data.total_points || 0),
-          thisWeekEpisodes: Math.floor((data.weekly_points || 0) / 50),
-          weeklyPoints: data.weekly_points || 0,
-          totalPoints: data.total_points || 0,
-        };
-
-        setStats(userStats);
-        setError(null);
-      } catch (err) {
-        console.error('Error in fetchUserStats:', err);
-        setError(err as Error);
-        // Set default stats even on error so UI doesn't break
+  // Expose fetch logic so callers can refetch when needed
+  const fetchUserStats = async () => {
+    try {
+      setLoading(true);
+      
+      // Get current user if userId not provided
+      const { data: { user }, error: authError } = await supabase.auth.getUser();
+      
+      if (authError) {
+        console.log('Auth error:', authError);
+        // User not logged in, use default stats
         setStats(getDefaultStats());
-      } finally {
+        setError(null);
         setLoading(false);
+        return;
       }
-    }
 
+      const currentUserId = userId || user?.id;
+      
+      if (!currentUserId) {
+        console.log('No user ID found, using default stats');
+        setStats(getDefaultStats());
+        setError(null);
+        setLoading(false);
+        return;
+      }
+
+      // Try to fetch user stats
+      const { data, error: fetchError } = await supabase
+        .from('user_stats')
+        .select('*')
+        .eq('user_id', currentUserId)
+        .maybeSingle(); // Use maybeSingle instead of single to handle empty results
+
+      if (fetchError) {
+        console.error('Fetch error:', fetchError);
+        throw fetchError;
+      }
+
+      // If no data exists, create initial stats for this user
+      if (!data) {
+        console.log('No stats found for user, creating initial stats...');
+        
+        const initialStats: UserStats = getDefaultStats();
+        
+        // Try to insert initial user stats
+        const { error: insertError } = await supabase
+          .from('user_stats')
+          .insert({
+            user_id: currentUserId,
+            total_points: 0,
+            weekly_points: 0,
+            daily_streak: 0,
+            rank_global: null,
+            rank_weekly: null,
+          });
+
+        if (insertError) {
+          console.error('Error creating initial stats:', insertError);
+        }
+
+        setStats(initialStats);
+        setError(null);
+        setLoading(false);
+        return;
+      }
+
+      // Transform database data to UserStats format
+      const userStats: UserStats = {
+        streak: data.daily_streak || 0,
+        wordsLearned: Math.floor((data.total_points || 0) / 10), // Assuming 10 points per word
+        phrasesLearned: Math.floor((data.total_points || 0) / 25), // Assuming 25 points per phrase
+        minutesToday: 0, // This would need to be calculated from activity log
+        totalMinutesThisMonth: Math.floor((data.total_points || 0) / 2), // Assuming 2 points per minute
+        totalEpisodesCompleted: Math.floor((data.total_points || 0) / 50), // Assuming 50 points per episode
+        currentLevel: getLevelFromPoints(data.total_points || 0),
+        thisWeekEpisodes: Math.floor((data.weekly_points || 0) / 50),
+        weeklyPoints: data.weekly_points || 0,
+        totalPoints: data.total_points || 0,
+      };
+
+      setStats(userStats);
+      setError(null);
+    } catch (err) {
+      console.error('Error in fetchUserStats:', err);
+      setError(err as Error);
+      // Set default stats even on error so UI doesn't break
+      setStats(getDefaultStats());
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
     fetchUserStats();
   }, [userId]);
 
-  return { stats, loading, error, refetch: () => {} };
+  return { stats, loading, error, refetch: fetchUserStats };
 }
 
 /**
