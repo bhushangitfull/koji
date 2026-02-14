@@ -53,6 +53,37 @@ export function parseVTT(content: string): string[] {
   return textLines;
 }
 
+// Check if character is Kanji only (not Hiragana or Katakana)
+export function isKanji(char: string): boolean {
+  const code = char.charCodeAt(0);
+  // Kanji: 4E00-9FFF
+  return code >= 0x4e00 && code <= 0x9fff;
+}
+
+// Check if character is Hiragana
+export function isHiragana(char: string): boolean {
+  const code = char.charCodeAt(0);
+  // Hiragana: 3040-309F
+  return code >= 0x3040 && code <= 0x309f;
+}
+
+// Check if character is Katakana
+export function isKatakana(char: string): boolean {
+  const code = char.charCodeAt(0);
+  // Katakana: 30A0-30FF
+  return code >= 0x30a0 && code <= 0x30ff;
+}
+
+// Check if word contains at least one Kanji character
+export function containsKanji(word: string): boolean {
+  for (let i = 0; i < word.length; i++) {
+    if (isKanji(word[i])) {
+      return true;
+    }
+  }
+  return false;
+}
+
 // Check if character is Japanese (Hiragana, Katakana, or Kanji)
 export function isJapanese(char: string): boolean {
   const code = char.charCodeAt(0);
@@ -94,6 +125,27 @@ export function extractJapaneseWords(text: string): string[] {
   return words;
 }
 
+// Extract Japanese words with their context sentences
+export function extractJapaneseWordsWithContext(textLines: string[]): Map<string, string[]> {
+  const wordContextMap = new Map<string, string[]>();
+
+  for (const line of textLines) {
+    const words = extractJapaneseWords(line);
+    for (const word of words) {
+      if (!wordContextMap.has(word)) {
+        wordContextMap.set(word, []);
+      }
+      // Store sentence where this word appears
+      const contexts = wordContextMap.get(word)!;
+      if (!contexts.includes(line)) {
+        contexts.push(line);
+      }
+    }
+  }
+
+  return wordContextMap;
+}
+
 // Remove duplicate words and sort by frequency
 export function deduplicateAndSort(words: string[]): Array<{ word: string; count: number }> {
   const wordMap = new Map<string, number>();
@@ -108,9 +160,9 @@ export function deduplicateAndSort(words: string[]): Array<{ word: string; count
     .sort((a, b) => b.count - a.count); // Sort by frequency (descending)
 }
 
-// Filter words (remove very short or very common words)
+// Filter words: keep only Kanji words, remove common particles/verbs
 export function filterCommonWords(words: Array<{ word: string; count: number }>): string[] {
-  // Common stopwords in Japanese
+  // Common stopwords in Japanese (mostly hiragana particles and auxiliary verbs)
   const commonWords = new Set([
     'は', 'を', 'に', 'が', 'で', 'から', 'まで', 'も', 'や', 'か',
     'の', 'や', 'って', 'ね', 'よ', 'な', 'ああ', 'あ', 'いい', 'い',
@@ -126,12 +178,15 @@ export function filterCommonWords(words: Array<{ word: string; count: number }>)
       // Skip common stopwords
       if (commonWords.has(word)) return false;
 
+      // ONLY include words with Kanji characters
+      if (!containsKanji(word)) return false;
+
       return true;
     })
     .map(({ word }) => word);
 }
 
-// Main function: Extract vocabulary from subtitle content
+// Main function: Extract vocabulary with context from subtitle content
 export function extractVocabularyFromSubtitle(subtitleText: string, format: 'srt' | 'vtt' = 'srt'): string[] {
   // Step 1: Parse subtitle format
   let textLines: string[] = [];
@@ -151,11 +206,51 @@ export function extractVocabularyFromSubtitle(subtitleText: string, format: 'srt
   // Step 3: Deduplicate and count frequency
   const sortedByFrequency = deduplicateAndSort(allWords);
 
-  // Step 4: Filter common words
+  // Step 4: Filter common words and Kanji only
   const filtered = filterCommonWords(sortedByFrequency);
 
   // Step 5: Return top N most frequent words
   return filtered.slice(0, 50); // Return top 50 words
+}
+
+// Enhanced extraction with context: returns word-context mapping
+export function extractVocabularyWithContext(
+  subtitleText: string,
+  format: 'srt' | 'vtt' = 'srt'
+): Map<string, { contexts: string[]; frequency: number }> {
+  // Step 1: Parse subtitle format
+  let textLines: string[] = [];
+  if (format === 'srt') {
+    textLines = parseSRT(subtitleText);
+  } else if (format === 'vtt') {
+    textLines = parseVTT(subtitleText);
+  }
+
+  // Step 2: Extract words with context
+  const wordContextMap = extractJapaneseWordsWithContext(textLines);
+
+  // Step 3: Extract all words and count frequency
+  const allWords: string[] = [];
+  textLines.forEach((line) => {
+    const wordsInLine = extractJapaneseWords(line);
+    allWords.push(...wordsInLine);
+  });
+
+  const sortedByFrequency = deduplicateAndSort(allWords);
+
+  // Step 4: Filter common words and Kanji only
+  const filtered = filterCommonWords(sortedByFrequency);
+
+  // Step 5: Build result map with context and frequency
+  const result = new Map<string, { contexts: string[]; frequency: number }>();
+  
+  for (const word of filtered.slice(0, 50)) {
+    const contexts = wordContextMap.get(word) || [];
+    const frequency = sortedByFrequency.find(w => w.word === word)?.count || 1;
+    result.set(word, { contexts, frequency });
+  }
+
+  return result;
 }
 
 // Export types

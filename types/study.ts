@@ -7,6 +7,7 @@ export enum QuestionType {
   MULTIPLE_CHOICE = 'multiple_choice',
   FILL_BLANK = 'fill_blank',
   LISTENING = 'listening',
+  FLASHCARD_REVIEW = 'flashcard_review',
 }
 
 export interface Flashcard {
@@ -53,6 +54,7 @@ export interface Quiz {
   episode_id: string;
   title: string;
   description?: string;
+  quiz_type?: string;
   total_questions: number;
   created_at?: string;
 }

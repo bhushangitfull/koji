@@ -61,7 +61,7 @@ export function useQuizQuestions(quizId?: string) {
           .from('quiz_questions')
           .select('*')
           .eq('quiz_id', quizId)
-          .order('display_order', { ascending: true });
+          .order('created_at', { ascending: true });
 
         if (fetchError) throw fetchError;
 

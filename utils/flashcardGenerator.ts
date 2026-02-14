@@ -117,7 +117,7 @@ const VOCABULARY_DICTIONARY: Record<string, {
   '忘れる': { furigana: 'わすれる', meaning: 'to forget', partOfSpeech: 'verb', exampleSentence: 'パスポートを忘れました。' },
   '覚える': { furigana: 'おぼえる', meaning: 'to remember', partOfSpeech: 'verb', exampleSentence: '名前を覚えました。' },
   '死ぬ': { furigana: 'しぬ', meaning: 'to die', partOfSpeech: 'verb', exampleSentence: '彼は死にました。' },
-  '生きる': { furikana: 'いきる', meaning: 'to live', partOfSpeech: 'verb', exampleSentence: '生きることは大切です。' },
+  '生きる': { furigana: 'いきる', meaning: 'to live', partOfSpeech: 'verb', exampleSentence: '生きることは大切です。' },
   
   // Family & People
   '家族': { furigana: 'かぞく', meaning: 'family', partOfSpeech: 'noun', exampleSentence: '私の家族は五人です。' },
@@ -253,37 +253,81 @@ Only return valid JSON, no other text.`,
 }
 
 // Create flashcard in Supabase
-export async function createFlashcard(
+// Create or get vocabulary entry, then create flashcard
+async function createVocabularyAndFlashcard(
   episodeId: string,
   word: string,
   definition: any
 ): Promise<string | null> {
   try {
-    console.log('Creating flashcard with episodeId:', episodeId);
-    const { data, error } = await supabase
+    // Step 1: Check if vocabulary already exists
+    const { data: existingVocab, error: searchError } = await supabase
+      .from('vocabulary')
+      .select('id')
+      .eq('japanese_text', word)
+      .single();
+
+    let vocabId: string;
+
+    if (existingVocab && existingVocab.id) {
+      // Vocabulary already exists, use it
+      vocabId = existingVocab.id;
+      console.log('Using existing vocabulary:', word, vocabId);
+    } else {
+      // Step 2: Create new vocabulary entry in master table
+      const { data: newVocab, error: vocabError } = await supabase
+        .from('vocabulary')
+        .insert({
+          japanese: word,
+          english: definition.meaning,
+          furigana: definition.furigana,
+          parts_of_speech: definition.partOfSpeech,
+        })
+        .select('id')
+        .single();
+
+      if (vocabError || !newVocab?.id) {
+        console.error('Error creating vocabulary:', vocabError);
+        return null;
+      }
+
+      vocabId = newVocab.id;
+      console.log('Created new vocabulary:', word, vocabId);
+    }
+
+    // Step 3: Create flashcard that references the vocabulary
+    const { data: flashcard, error: flashcardError } = await supabase
       .from('flashcards')
       .insert({
         episode_id: episodeId,
+        vocab_id: vocabId,
         japanese_text: word,
         english_translation: definition.meaning,
         furigana: definition.furigana,
         part_of_speech: definition.partOfSpeech,
-        example_sentence: definition.exampleSentence,
-        audio_url: null, // Can be added later
       })
       .select('id')
       .single();
 
-    if (error) {
-      console.error('Error creating flashcard:', error);
+    if (flashcardError) {
+      console.error('Error creating flashcard:', flashcardError);
       return null;
     }
 
-    return data?.id || null;
+    console.log('Created flashcard:', flashcard?.id, 'for episode:', episodeId);
+    return flashcard?.id || null;
   } catch (error) {
-    console.error('Error in createFlashcard:', error);
+    console.error('Error in createVocabularyAndFlashcard:', error);
     return null;
   }
+}
+
+export async function createFlashcard(
+  episodeId: string,
+  word: string,
+  definition: any
+): Promise<string | null> {
+  return createVocabularyAndFlashcard(episodeId, word, definition);
 }
 
 // Generate flashcards for multiple words
@@ -295,75 +339,98 @@ export async function generateFlashcardsForEpisode(
   const cardIds: string[] = [];
   let created = 0;
 
-  for (const word of vocabulary) {
-    try {
-      // Get definition (from dictionary or AI)
-      const definition = await generateDefinitionWithAI(word, openaiKey);
+  try {
+    // First, delete existing flashcards for this episode to avoid duplicates
+    const { error: deleteError } = await supabase
+      .from('flashcards')
+      .delete()
+      .eq('episode_id', episodeId);
 
-      if (!definition) {
-        console.warn(`No definition found for word: ${word}`);
-        continue;
-      }
-
-      // Create flashcard in Supabase
-      const cardId = await createFlashcard(episodeId, word, definition);
-
-      if (cardId) {
-        cardIds.push(cardId);
-        created++;
-      }
-
-      // Add small delay to avoid rate limiting
-      await new Promise((resolve) => setTimeout(resolve, 100));
-    } catch (error) {
-      console.error(`Error processing word ${word}:`, error);
+    if (deleteError) {
+      console.warn('Error deleting existing flashcards:', deleteError);
+      // Continue anyway, might be first generation
+    } else {
+      console.log('Deleted existing flashcards for episode:', episodeId);
     }
-  }
 
-  return {
-    success: created > 0,
-    cardCount: created,
-    cardIds,
-  };
+    for (const word of vocabulary) {
+      try {
+        // Get definition (from dictionary or AI)
+        const definition = await generateDefinitionWithAI(word, openaiKey);
+
+        if (!definition) {
+          console.warn(`No definition found for word: ${word}`);
+          continue;
+        }
+
+        // Create flashcard in Supabase
+        const cardId = await createFlashcard(episodeId, word, definition);
+
+        if (cardId) {
+          cardIds.push(cardId);
+          created++;
+        }
+
+        // Add small delay to avoid rate limiting
+        await new Promise((resolve) => setTimeout(resolve, 100));
+      } catch (error) {
+        console.error(`Error processing word ${word}:`, error);
+      }
+    }
+
+    return {
+      success: created > 0,
+      cardCount: created,
+      cardIds,
+    };
+  } catch (error) {
+    console.error('Error in generateFlashcardsForEpisode:', error);
+    return {
+      success: false,
+      cardCount: 0,
+      cardIds: [],
+    };
+  }
 }
 
 // Create quiz questions from flashcards
 export async function generateQuizForEpisode(
   episodeId: string,
-  flashcardIds: string[]
+  flashcardIds: string[],
+  vocabularyMap?: Map<string, { contexts: string[]; frequency: number }>
 ): Promise<{ success: boolean; quizId: string | null }> {
   if (flashcardIds.length === 0) {
     return { success: false, quizId: null };
   }
 
   try {
-    // Create quiz
-    const { data: quiz, error: quizError } = await supabase
+    // Delete existing quizzes and their questions for this episode to avoid duplicates
+    const { data: existingQuizzes, error: fetchError } = await supabase
       .from('quizzes')
-      .insert({
-        episode_id: episodeId,
-        title: `Flashcard Review Quiz`,
-        quiz_type: 'flashcard_review',
-        total_questions: flashcardIds.length,
-      })
       .select('id')
-      .single();
+      .eq('episode_id', episodeId);
 
-    if (quizError) {
-      console.error('Error creating quiz:', quizError);
-      return { success: false, quizId: null };
-    }
+    if (!fetchError && existingQuizzes && existingQuizzes.length > 0) {
+      for (const quiz of existingQuizzes) {
+        // Delete quiz questions
+        await supabase
+          .from('quiz_questions')
+          .delete()
+          .eq('quiz_id', quiz.id);
 
-    const quizId = quiz?.id;
-
-    if (!quizId) {
-      return { success: false, quizId: null };
+        // Delete quiz
+        await supabase
+          .from('quizzes')
+          .delete()
+          .eq('id', quiz.id);
+      }
+      console.log(`Deleted ${existingQuizzes.length} existing quizzes for episode:`, episodeId);
     }
 
     // Fetch flashcard data to create questions
     const { data: cards, error: cardsError } = await supabase
       .from('flashcards')
-      .select('id, japanese_text, english_translation')
+      .select('id, japanese_text, english_translation, vocab_id, furigana, part_of_speech')
       .in('id', flashcardIds);
 
     if (cardsError || !cards) {
@@ -371,47 +438,77 @@ export async function generateQuizForEpisode(
       return { success: false, quizId: null };
     }
 
-    // Create multiple choice questions
-    for (let i = 0; i < cards.length; i++) {
-      const card = cards[i];
+    console.log('Fetched flashcards for quiz generation:', cards.length, 'cards');
 
-      // Generate multiple choice options (correct answer + 3 wrong answers)
-      const allAnswers = cards.map((c) => c.english_translation);
-      const correctAnswer = card.english_translation;
-      const wrongAnswers = allAnswers.filter((a) => a !== correctAnswer).slice(0, 3);
+    // Create Flashcard Review Quiz only
+    const quizId = await createFlashcardReviewQuiz(episodeId, cards);
 
-      // Ensure we have 3 wrong answers
-      if (wrongAnswers.length < 3) {
-        wrongAnswers.push('unknown meaning');
-        wrongAnswers.push('different definition');
-        wrongAnswers.push('another translation');
-      }
-
-      const options = [correctAnswer, ...wrongAnswers.slice(0, 3)];
-      // Shuffle options
-      options.sort(() => Math.random() - 0.5);
-
-      await supabase.from('quiz_questions').insert({
-        quiz_id: quizId,
-        question_type: 'multiple_choice',
-        question_text: `What does "${card.japanese_text}" mean?`,
-        correct_answer: correctAnswer,
-        options: options,
-        display_order: i + 1,
-      });
-    }
-
-    return { success: true, quizId };
+    return {
+      success: quizId !== null,
+      quizId,
+    };
   } catch (error) {
-    console.error('Error generating quiz:', error);
+    console.error('Error generating quizzes:', error);
     return { success: false, quizId: null };
   }
 }
+
+async function createFlashcardReviewQuiz(
+  episodeId: string,
+  cards: Array<{ id: string; japanese_text: string; english_translation: string; vocab_id?: string }>
+): Promise<string | null> {
+  try {
+    const { data: quiz, error: quizError } = await supabase
+      .from('quizzes')
+      .insert({
+        episode_id: episodeId,
+        title: `Flashcard Review`,
+        quiz_type: 'flashcard_review',
+        total_questions: cards.length,
+      })
+      .select('id')
+      .single();
+
+    if (quizError || !quiz?.id) {
+      console.error('Error creating flashcard review quiz:', quizError);
+      return null;
+    }
+
+    const quizId = quiz.id;
+    let questionsCreated = 0;
+
+    // Create flashcard review questions (just showing the word and its meaning)
+    for (let i = 0; i < cards.length; i++) {
+      const card = cards[i];
+      const { error: insertError } = await supabase.from('quiz_questions').insert({
+        quiz_id: quizId,
+        question_type: 'flashcard_review',
+        question_text: card.japanese_text,
+        correct_answer: card.english_translation,
+        vocab_id: card.vocab_id,
+      });
+
+      if (insertError) {
+        console.error(`Error inserting flashcard review question ${i}:`, insertError);
+      } else {
+        questionsCreated++;
+      }
+    }
+
+    console.log(`Created flashcard review quiz: ${quizId} with ${questionsCreated}/${cards.length} questions`);
+    return quizId;
+  } catch (error) {
+    console.error('Error in createFlashcardReviewQuiz:', error);
+    return null;
+  }
+}
+
 
 // Main function: Generate everything for an episode
 export async function generateLearningMaterialsForEpisode(
   episodeId: string,
   vocabulary: string[],
+  vocabularyMap?: Map<string, { contexts: string[]; frequency: number }>,
   openaiKey?: string
 ): Promise<{
   success: boolean;
@@ -436,17 +533,18 @@ export async function generateLearningMaterialsForEpisode(
       };
     }
 
-    // Step 2: Generate quiz from flashcards
+    // Step 2: Generate flashcard review quiz from flashcards
     const quizResult = await generateQuizForEpisode(
       episodeId,
-      flashcardResult.cardIds
+      flashcardResult.cardIds,
+      vocabularyMap // Pass context data
     );
 
     return {
-      success: true,
+      success: quizResult.success,
       flashcards: flashcardResult.cardCount,
       quizId: quizResult.quizId,
-      message: `Created ${flashcardResult.cardCount} flashcards and quiz`,
+      message: `Created ${flashcardResult.cardCount} flashcards and 1 Flashcard Review quiz`,
     };
   } catch (error) {
     console.error('Error in generateLearningMaterialsForEpisode:', error);

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { supabase } from '@/utils/supabase';
 import { Episode } from '@/types/study';
 
@@ -94,4 +94,79 @@ export function useEpisodeWithProgress(episodeId?: string) {
   }, [episodeId]);
 
   return { episode, flashcardsCount, quizAvailable, loading, error };
+}
+
+export function useEpisodesWithCounts() {
+  const [episodes, setEpisodes] = useState<(Episode & { flashcardsCount: number; quizzesCount: number })[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<Error | null>(null);
+  const [refetchTrigger, setRefetchTrigger] = useState(0);
+
+  useEffect(() => {
+    async function fetchEpisodesWithCounts() {
+      try {
+        setLoading(true);
+        const { data: episodesData, error: episodeError } = await supabase
+          .from('episodes')
+          .select('*')
+          .order('created_at', { ascending: true });
+
+        if (episodeError) throw episodeError;
+
+        if (!episodesData) {
+          setEpisodes([]);
+          setLoading(false);
+          return;
+        }
+
+        // Fetch counts for all episodes
+        const episodesWithCounts = await Promise.all(
+          episodesData.map(async (episode) => {
+            // Count flashcards
+            const { count: flashcardsCount = 0, error: fcError } = await supabase
+              .from('flashcards')
+              .select('id', { count: 'exact', head: true })
+              .eq('episode_id', episode.id);
+
+            if (fcError) {
+              console.error(`Error fetching flashcards count for ${episode.id}:`, fcError);
+            }
+
+            // Count quizzes
+            const { count: quizzesCount = 0, error: qError } = await supabase
+              .from('quizzes')
+              .select('id', { count: 'exact', head: true })
+              .eq('episode_id', episode.id);
+
+            if (qError) {
+              console.error(`Error fetching quizzes count for ${episode.id}:`, qError);
+            }
+
+            return {
+              ...episode,
+              flashcardsCount: flashcardsCount || 0,
+              quizzesCount: quizzesCount || 0,
+            };
+          })
+        );
+
+        setEpisodes(episodesWithCounts);
+        setError(null);
+      } catch (err) {
+        console.error('Error fetching episodes with counts:', err);
+        setError(err as Error);
+        setEpisodes([]);
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    fetchEpisodesWithCounts();
+  }, [refetchTrigger]);
+
+  const refetch = useCallback(() => {
+    setRefetchTrigger(prev => prev + 1);
+  }, []);
+
+  return { episodes, loading, error, refetch };
 }

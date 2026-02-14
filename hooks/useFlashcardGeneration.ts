@@ -3,7 +3,7 @@
  */
 
 import { useState } from 'react';
-import { extractVocabularyFromSubtitle } from '@/utils/vocabularyExtractor';
+import { extractVocabularyFromSubtitle, extractVocabularyWithContext } from '@/utils/vocabularyExtractor';
 import { generateLearningMaterialsForEpisode } from '@/utils/flashcardGenerator';
 
 export interface GenerationState {
@@ -41,16 +41,20 @@ export function useFlashcardGeneration() {
     });
 
     try {
-      // Step 1: Extract vocabulary (10% progress)
+      // Step 1: Extract vocabulary with context (10% progress)
       setState((s) => ({ ...s, progress: 10, status: 'Extracting vocabulary...' }));
-      const vocabulary = extractVocabularyFromSubtitle(subtitleContent, subtitleFormat);
+      const vocabularyMap = extractVocabularyWithContext(subtitleContent, subtitleFormat);
+      const vocabulary = Array.from(vocabularyMap.keys());
+      console.log('[Flashcard Generation] Extracted vocabulary:', vocabulary.length, 'words (Kanji only)');
 
       if (vocabulary.length === 0) {
+        const error = 'No Kanji vocabulary found in subtitles';
+        console.error('[Flashcard Generation] Error:', error);
         setState({
           loading: false,
           progress: 0,
           status: '',
-          error: 'No vocabulary found in subtitles',
+          error,
           result: null,
         });
         return false;
@@ -59,17 +63,22 @@ export function useFlashcardGeneration() {
       setState((s) => ({
         ...s,
         progress: 20,
-        status: `Found ${vocabulary.length} unique words. Generating flashcards...`,
+        status: `Found ${vocabulary.length} unique Kanji words. Generating flashcards...`,
       }));
 
       // Step 2: Generate flashcards and quiz (80% progress)
+      console.log('[Flashcard Generation] Starting generation for episode:', episodeId);
       const result = await generateLearningMaterialsForEpisode(
         episodeId,
         vocabulary.slice(0, 20), // Limit to top 20 words
+        vocabularyMap, // Pass context data
         openaiKey
       );
 
+      console.log('[Flashcard Generation] Generation result:', result);
+
       if (!result.success) {
+        console.error('[Flashcard Generation] Generation failed:', result.message);
         setState({
           loading: false,
           progress: 0,
@@ -81,6 +90,7 @@ export function useFlashcardGeneration() {
       }
 
       // Success! (100% progress)
+      console.log('[Flashcard Generation] Success! Created', result.flashcards, 'flashcards');
       setState({
         loading: false,
         progress: 100,
@@ -95,11 +105,12 @@ export function useFlashcardGeneration() {
       return true;
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      console.error('[Flashcard Generation] Exception:', errorMessage, error);
       setState({
         loading: false,
         progress: 0,
         status: '',
-        error: errorMessage,
+        error: `Error: ${errorMessage}`,
         result: null,
       });
       return false;
